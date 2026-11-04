@@ -1,0 +1,43 @@
+{
+  "merchants": {
+    "sri murugan traders": {
+      "merchant": "Sri Murugan Traders",
+      "category": "Groceries & Supplies",
+      "location": "Karugambathur, Vellore, Tamil Nadu – 632013",
+      "gstin": "33ANDPB6735F1ZF",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-04T07:49:01.162Z"
+    },
+    "sih - r & lc, karigiri": {
+      "merchant": "SIH - R & LC, Karigiri",
+      "category": "Health & Medical",
+      "location": "Arumparuthi, Vellore, Tamil Nadu – 632106",
+      "gstin": "33AAATS0944D1ZX",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-04T07:50:01.197Z"
+    }
+  },
+  "gstins": {
+    "33ANDPB6735F1ZF": {
+      "tradeName": "Sri Murugan Traders",
+      "address": "Karugambathur, Vellore, Tamil Nadu – 632013",
+      "category": "Groceries & Supplies",
+      "verified": true
+    },
+    "33AAATS0944D1ZX": {
+      "tradeName": "SIH - R & LC, Karigiri",
+      "address": "Arumparuthi, Vellore, Tamil Nadu – 632106",
+      "category": "Health & Medical",
+      "verified": true
+    }
+  },
+  "locations": {},
+  "stats": {
+    "totalLearned": 7,
+    "totalScansProcessed": 26,
+    "accuracyScore": "99.8%",
+    "lastTrainedAt": "2026-11-04T07:50:01.197Z"
+  }
+}

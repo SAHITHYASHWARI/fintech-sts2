@@ -1,0 +1,32 @@
+# Dependencies
+node_modules
+*/node_modules
+ExpenseTrack/node_modules
+ExpenseTrack1/node_modules
+
+# Production build outputs
+dist
+*/dist
+ExpenseTrack/dist
+dist-ssr
+*.local
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Uploads & Temporary Stores
+ExpenseTrack1/uploads/*
+!ExpenseTrack1/uploads/.gitkeep
+ExpenseTrack1/data/bills_store.json
+
+# System files
+.DS_Store
+Thumbs.db

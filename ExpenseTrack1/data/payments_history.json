@@ -1,0 +1,22 @@
+[
+  {
+    "id": "pmt-1793556876574",
+    "bill_id": "bill-man-1793556876563",
+    "user_id": "user_sections_1793556876490",
+    "amount_paid": 4000,
+    "payment_mode": "UPI",
+    "payment_date": "2026-11-01",
+    "notes": "",
+    "created_at": "2026-11-01T18:14:36.574Z"
+  },
+  {
+    "id": "pmt-1793554786093",
+    "bill_id": "bill-man-1793554786083",
+    "user_id": "user_sections_1793554786034",
+    "amount_paid": 4000,
+    "payment_mode": "UPI",
+    "payment_date": "2026-11-01",
+    "notes": "",
+    "created_at": "2026-11-01T17:39:46.093Z"
+  }
+]

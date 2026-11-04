@@ -1,0 +1,21 @@
+{
+  "name": "sts-fintech",
+  "version": "1.0.0",
+  "private": true,
+  "description": "STS FINTECH - Universal AI Bill Scanner, Reminder & Expense Analytics",
+  "scripts": {
+    "build": "cd ExpenseTrack && npm install && npm run build",
+    "start": "node ExpenseTrack1/server.js",
+    "server": "node ExpenseTrack1/server.js",
+    "client": "cd ExpenseTrack && npm run dev"
+  },
+  "keywords": [
+    "fintech",
+    "ocr",
+    "gstin",
+    "google-lens",
+    "expense-tracker"
+  ],
+  "author": "SAHITHYASHWARI",
+  "license": "ISC"
+}
