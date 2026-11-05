@@ -38,12 +38,12 @@
     },
     "redbus (makemytrip india limited)": {
       "merchant": "redBus (MakeMyTrip India Limited)",
-      "category": "Travel & Transit",
-      "location": "Chennai - 600040, Tamil Nadu / Reg: Gurugram, Haryana - 122002",
+      "category": "General",
+      "location": ", Tamil Nadu",
       "gstin": "33AADCM5146R1Z2",
       "confidence": 99.8,
-      "timesConfirmed": 1,
-      "updatedAt": "2026-11-05T06:14:34.334Z"
+      "timesConfirmed": 2,
+      "updatedAt": "2026-11-05T06:23:31.760Z"
     },
     "ramraj cotton": {
       "merchant": "Ramraj Cotton",
@@ -226,8 +226,8 @@
     },
     "33AADCM5146R1Z2": {
       "tradeName": "redBus (MakeMyTrip India Limited)",
-      "address": "Chennai - 600040, Tamil Nadu / Reg: Gurugram, Haryana - 122002",
-      "category": "Travel & Transit",
+      "address": ", Tamil Nadu",
+      "category": "General",
       "verified": true
     },
     "33AAHFR2641F1ZI": {
@@ -300,8 +300,8 @@
   "locations": {},
   "stats": {
     "totalLearned": 27,
-    "totalScansProcessed": 46,
+    "totalScansProcessed": 47,
     "accuracyScore": "99.8%",
-    "lastTrainedAt": "2026-11-05T06:14:34.379Z"
+    "lastTrainedAt": "2026-11-05T06:23:31.760Z"
   }
 }

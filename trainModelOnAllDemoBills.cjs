@@ -123,3 +123,4 @@ trainingDataset.forEach((bill) => {
 });
 
 console.log('Trained Model Stats:', trainedModelService.getStats());
+
