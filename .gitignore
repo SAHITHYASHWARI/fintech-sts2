@@ -31,3 +31,5 @@ ExpenseTrack1/data/bills_store.json
 .DS_Store
 Thumbs.db
 
+
+.vercel

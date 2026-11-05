@@ -234,7 +234,7 @@ const VERIFIED_ENTERPRISE_REGISTRY = {
     pincode: '600040',
     status: 'Active',
     verified: true,
-    category: 'Travel & Transit',
+    category: 'Travel & Transit', 
   },
   '21FZPPS1850H1Z4': {
     tradeName: 'Odisha Hotel',
