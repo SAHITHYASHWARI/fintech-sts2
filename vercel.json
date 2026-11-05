@@ -1,8 +1,6 @@
 {
-  "framework": "vite",
-  "rootDirectory": "ExpenseTrack",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "buildCommand": "cd ExpenseTrack && npm install && npm run build",
+  "outputDirectory": "ExpenseTrack/dist",
   "rewrites": [
     {
       "source": "/api/(.*)",
