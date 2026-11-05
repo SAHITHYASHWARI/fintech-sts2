@@ -94,7 +94,38 @@ class TrainedModelService {
   constructor() {
     this.learnedPatterns = {
       merchants: {},
-      gstins: {},
+      gstins: {
+        '33AADCM5146R1Z2': {
+          tradeName: 'redBus (MakeMyTrip India Limited)',
+          address: 'Chennai - 600040, Tamil Nadu / Reg: Gurugram, Haryana - 122002',
+          category: 'Travel & Transit',
+          verified: true,
+        },
+        '33CMOPS3767A1ZV': {
+          tradeName: 'Arunai Medicals',
+          address: 'No. 92/1, Katchery Street, Tirupattur - 635601, Tamil Nadu',
+          category: 'Health & Medical',
+          verified: true,
+        },
+        '33AAHFR2641F1ZI': {
+          tradeName: 'Ramraj Cotton',
+          address: 'No. 620/4, Vellore Road, Near Chittoor Bus Stand, Katpadi - 632007, Tamil Nadu',
+          category: 'Clothing & Apparel',
+          verified: true,
+        },
+        '33ANDPB6735F1ZF': {
+          tradeName: 'Sri Murugan Traders',
+          address: 'No. 19, 1st Cross Street, Sakthi Nagar, Konavattam, Vellore - 632013, Tamil Nadu',
+          category: 'Groceries & Supplies',
+          verified: true,
+        },
+        '33AAATS0944D1ZX': {
+          tradeName: 'SIH - R & LC, Karigiri',
+          address: 'Karigiri, Katpadi Taluk, Vellore - 632106, Tamil Nadu',
+          category: 'Health & Medical',
+          verified: true,
+        },
+      },
       locations: {},
       stats: {
         totalLearned: 5,

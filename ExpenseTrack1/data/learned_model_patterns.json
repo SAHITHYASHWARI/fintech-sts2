@@ -17,6 +17,186 @@
       "confidence": 99.8,
       "timesConfirmed": 1,
       "updatedAt": "2026-11-04T07:50:01.197Z"
+    },
+    "gujarat freight tools": {
+      "merchant": "Gujarat Freight Tools",
+      "category": "General",
+      "location": "Rajkot, Rajkot, Gujarat – 360001",
+      "gstin": "27CORPP3939N1ZQ",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-04T08:59:06.104Z"
+    },
+    "arunai medicals": {
+      "merchant": "Arunai Medicals",
+      "category": "General",
+      "location": ", Tamil Nadu",
+      "gstin": "33CMOPS3767A1ZV",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-04T09:14:01.416Z"
+    },
+    "redbus (makemytrip india limited)": {
+      "merchant": "redBus (MakeMyTrip India Limited)",
+      "category": "Travel & Transit",
+      "location": "Chennai - 600040, Tamil Nadu / Reg: Gurugram, Haryana - 122002",
+      "gstin": "33AADCM5146R1Z2",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.334Z"
+    },
+    "ramraj cotton": {
+      "merchant": "Ramraj Cotton",
+      "category": "Clothing & Apparel",
+      "location": "No. 620/4, Vellore Road, Near Chittoor Bus Stand, Katpadi - 632007, Tamil Nadu",
+      "gstin": "33AAHFR2641F1ZI",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.338Z"
+    },
+    "masha pharmacy": {
+      "merchant": "Masha Pharmacy",
+      "category": "Health & Medical",
+      "location": "50, Vallimalai Road, Katpadi, Vellore - 632007, Tamil Nadu",
+      "gstin": "33ACEFM3457F1Z0",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.342Z"
+    },
+    "katpadi kitchen": {
+      "merchant": "Katpadi Kitchen",
+      "category": "Dining & Restaurant",
+      "location": "3rd Street Opposite VIT Main Gate, Vellakalmedu, Katpadi, Vellore - 632007, Tamil Nadu",
+      "gstin": "",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.344Z"
+    },
+    "hotel roopali": {
+      "merchant": "Hotel Roopali",
+      "category": "Dining & Restaurant",
+      "location": "F.C. Road, Shivajinagar, Pune - 411005, Maharashtra",
+      "gstin": "27ADNPS1534J1ZF",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.347Z"
+    },
+    "hotel dhruvathare": {
+      "merchant": "Hotel Dhruvathare",
+      "category": "Dining & Restaurant",
+      "location": "Kalinganahalli Grama, Bellur Hobli, Nagamangala, Mandya, Karnataka - 572142",
+      "gstin": "29AADCL1430Q1Z2",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.350Z"
+    },
+    "odisha hotel": {
+      "merchant": "Odisha Hotel",
+      "category": "Dining & Restaurant",
+      "location": "F-19, Chandrasekharpur, Behind Trident College, Infocity, Bhubaneswar - 751024, Odisha",
+      "gstin": "21FZPPS1850H1Z4",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.352Z"
+    },
+    "the lake hill": {
+      "merchant": "The Lake Hill",
+      "category": "Hotel & Lodging",
+      "location": "Near Main Boat Stand, Bhimtal Daant, Bhimtal, Uttarakhand - 263136",
+      "gstin": "05AEBFS0701F1ZP",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.355Z"
+    },
+    "classik family restaurant": {
+      "merchant": "Classik Family Restaurant",
+      "category": "Dining & Restaurant",
+      "location": "Manpada Kalyan Sheel Rd, Dombivli, Maharashtra - 421204",
+      "gstin": "27AAGFH4645G2ZB",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.358Z"
+    },
+    "hotel saravana bhavan": {
+      "merchant": "Hotel Saravana Bhavan",
+      "category": "Dining & Restaurant",
+      "location": "Vadapalani, Chennai - 600026, Tamil Nadu",
+      "gstin": "",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.361Z"
+    },
+    "grandview hotel mumbai": {
+      "merchant": "Grandview Hotel Mumbai",
+      "category": "Hotel & Lodging",
+      "location": "Marine Drive, Mumbai - 400020, Maharashtra",
+      "gstin": "19AAACT7896K1Z8",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.364Z"
+    },
+    "hotel bawee": {
+      "merchant": "Hotel Bawee",
+      "category": "Hotel & Lodging",
+      "location": "Jamshedpur, Jharkhand - 831001",
+      "gstin": "20ASNPK8100J1ZN",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.366Z"
+    },
+    "hotel city palace": {
+      "merchant": "Hotel City Palace",
+      "category": "Hotel & Lodging",
+      "location": "Ranchi, Jharkhand - 834001",
+      "gstin": "20ADFPB1250K1ZE",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.369Z"
+    },
+    "sleek bill": {
+      "merchant": "Sleek Bill",
+      "category": "General",
+      "location": "Panchsheel Square, Tapovan Road, Amravati, Maharashtra - 444601",
+      "gstin": "27AAFCV2419G1ZT",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.371Z"
+    },
+    "indish the veg treat": {
+      "merchant": "Indish The Veg Treat",
+      "category": "Dining & Restaurant",
+      "location": "Kharadi Magarpatta Road, Opp Radisson Blu Hotel, Pune - 411014",
+      "gstin": "",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.373Z"
+    },
+    "mahamaya hotel": {
+      "merchant": "Mahamaya Hotel",
+      "category": "Hotel & Lodging",
+      "location": "Oakland Bldgs, Shillong - 793001, Meghalaya",
+      "gstin": "",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.375Z"
+    },
+    "the ajit bhawan": {
+      "merchant": "The Ajit Bhawan",
+      "category": "Hotel & Lodging",
+      "location": "Jodhpur, Rajasthan - 342006",
+      "gstin": "",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.377Z"
+    },
+    "nath traders": {
+      "merchant": "Nath Traders",
+      "category": "Groceries & Supplies",
+      "location": "Main Market, Guwahati, Assam",
+      "gstin": "",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-05T06:14:34.379Z"
     }
   },
   "gstins": {
@@ -31,13 +211,97 @@
       "address": "Arumparuthi, Vellore, Tamil Nadu – 632106",
       "category": "Health & Medical",
       "verified": true
+    },
+    "27CORPP3939N1ZQ": {
+      "tradeName": "Gujarat Freight Tools",
+      "address": "Rajkot, Rajkot, Gujarat – 360001",
+      "category": "General",
+      "verified": true
+    },
+    "33CMOPS3767A1ZV": {
+      "tradeName": "Arunai Medicals",
+      "address": ", Tamil Nadu",
+      "category": "General",
+      "verified": true
+    },
+    "33AADCM5146R1Z2": {
+      "tradeName": "redBus (MakeMyTrip India Limited)",
+      "address": "Chennai - 600040, Tamil Nadu / Reg: Gurugram, Haryana - 122002",
+      "category": "Travel & Transit",
+      "verified": true
+    },
+    "33AAHFR2641F1ZI": {
+      "tradeName": "Ramraj Cotton",
+      "address": "No. 620/4, Vellore Road, Near Chittoor Bus Stand, Katpadi - 632007, Tamil Nadu",
+      "category": "Clothing & Apparel",
+      "verified": true
+    },
+    "33ACEFM3457F1Z0": {
+      "tradeName": "Masha Pharmacy",
+      "address": "50, Vallimalai Road, Katpadi, Vellore - 632007, Tamil Nadu",
+      "category": "Health & Medical",
+      "verified": true
+    },
+    "27ADNPS1534J1ZF": {
+      "tradeName": "Hotel Roopali",
+      "address": "F.C. Road, Shivajinagar, Pune - 411005, Maharashtra",
+      "category": "Dining & Restaurant",
+      "verified": true
+    },
+    "29AADCL1430Q1Z2": {
+      "tradeName": "Hotel Dhruvathare",
+      "address": "Kalinganahalli Grama, Bellur Hobli, Nagamangala, Mandya, Karnataka - 572142",
+      "category": "Dining & Restaurant",
+      "verified": true
+    },
+    "21FZPPS1850H1Z4": {
+      "tradeName": "Odisha Hotel",
+      "address": "F-19, Chandrasekharpur, Behind Trident College, Infocity, Bhubaneswar - 751024, Odisha",
+      "category": "Dining & Restaurant",
+      "verified": true
+    },
+    "05AEBFS0701F1ZP": {
+      "tradeName": "The Lake Hill",
+      "address": "Near Main Boat Stand, Bhimtal Daant, Bhimtal, Uttarakhand - 263136",
+      "category": "Hotel & Lodging",
+      "verified": true
+    },
+    "27AAGFH4645G2ZB": {
+      "tradeName": "Classik Family Restaurant",
+      "address": "Manpada Kalyan Sheel Rd, Dombivli, Maharashtra - 421204",
+      "category": "Dining & Restaurant",
+      "verified": true
+    },
+    "19AAACT7896K1Z8": {
+      "tradeName": "Grandview Hotel Mumbai",
+      "address": "Marine Drive, Mumbai - 400020, Maharashtra",
+      "category": "Hotel & Lodging",
+      "verified": true
+    },
+    "20ASNPK8100J1ZN": {
+      "tradeName": "Hotel Bawee",
+      "address": "Jamshedpur, Jharkhand - 831001",
+      "category": "Hotel & Lodging",
+      "verified": true
+    },
+    "20ADFPB1250K1ZE": {
+      "tradeName": "Hotel City Palace",
+      "address": "Ranchi, Jharkhand - 834001",
+      "category": "Hotel & Lodging",
+      "verified": true
+    },
+    "27AAFCV2419G1ZT": {
+      "tradeName": "Sleek Bill",
+      "address": "Panchsheel Square, Tapovan Road, Amravati, Maharashtra - 444601",
+      "category": "General",
+      "verified": true
     }
   },
   "locations": {},
   "stats": {
-    "totalLearned": 7,
-    "totalScansProcessed": 26,
+    "totalLearned": 27,
+    "totalScansProcessed": 46,
     "accuracyScore": "99.8%",
-    "lastTrainedAt": "2026-11-04T07:50:01.197Z"
+    "lastTrainedAt": "2026-11-05T06:14:34.379Z"
   }
 }

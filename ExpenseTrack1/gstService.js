@@ -373,6 +373,15 @@ class GSTVerificationService {
         address: 'Main Branch, Katpadi, Vellore - 632007, Tamil Nadu',
         state: 'Tamil Nadu',
       },
+      '33AADCM5146R1Z2': {
+        tradeName: 'redBus (MakeMyTrip India Limited)',
+        legalName: 'MakeMyTrip (India) Limited',
+        active: true,
+        address: 'Tower A, SP Infocity, Udyog Vihar, Gurugram, Haryana - 122002 / Branch: Chennai - 600040, Tamil Nadu',
+        state: 'Tamil Nadu',
+        pincode: '600040',
+        category: 'Travel & Transit',
+      },
       '33AAAGM0289C1ZQ': {
         tradeName: 'Indian Railways',
         legalName: 'Ministry of Railways (Southern Railway)',
