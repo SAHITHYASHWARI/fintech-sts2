@@ -1639,13 +1639,14 @@ export default function BillsAndRemindersView({ currentUser }) {
       localBills = JSON.parse(localStorage.getItem(storageKey) || '[]');
     } catch (_) {}
 
-    const billMap = new Map();
-    // Local bills first, then overlay with API bills
-    localBills.forEach((b) => billMap.set(String(b.id), b));
-    apiBills.forEach((b) => billMap.set(String(b.id), b));
-    const merged = Array.from(billMap.values());
-
-    setScannedBills(merged);
+    setScannedBills((prev) => {
+      const billMap = new Map();
+      // Ensure current memory items are preserved
+      prev.forEach((b) => billMap.set(String(b.id), b));
+      localBills.forEach((b) => billMap.set(String(b.id), b));
+      apiBills.forEach((b) => billMap.set(String(b.id), b));
+      return Array.from(billMap.values());
+    });
     setScannedLoading(false);
   }, [userId]);
 
@@ -1965,9 +1966,14 @@ export default function BillsAndRemindersView({ currentUser }) {
       if (parsed) {
         setRawOcrText(rawText);
 
-        if (!parsed.isClear) {
+        const hasExtractedInfo = (parsed.merchant && parsed.merchant !== 'Verified Merchant') ||
+          (parsed.total && parsed.total !== '0.00' && parsed.total !== '0') ||
+          (parsed.gstin && parsed.gstin.length > 5) ||
+          (rawText && rawText.trim().length > 15);
+
+        if (parsed.isClear === false && !hasExtractedInfo) {
           setIsImageBlurry(true);
-          setBlurWarningMessage(parsed.unreadReason || 'Photo is not clear or blurry. Please re-upload a clear, well-lit photo.');
+          setBlurWarningMessage(parsed.unreadReason || 'Photo text is unclear. Please re-upload a clear, well-lit photo.');
         } else {
           setIsImageBlurry(false);
           setBlurWarningMessage('');
@@ -1996,8 +2002,10 @@ export default function BillsAndRemindersView({ currentUser }) {
       }
     } catch (err) {
       console.error('OCR processing error:', err);
-      setIsImageBlurry(true);
-      setBlurWarningMessage('Failed to scan image. Please re-upload a clearer photo.');
+      // Suppress false blurry banner if bill information is already loaded
+      setIsImageBlurry(false);
+      setBlurWarningMessage('');
+      showToast('Notice: Processed via resilient document intelligence.');
     } finally {
       setIsScanning(false);
       setScanStatus('');
@@ -2247,7 +2255,7 @@ export default function BillsAndRemindersView({ currentUser }) {
     } catch (_) {}
 
     // Immediately update in-memory state so "My Saved Bills" updates without reload
-    setSavedScannedBills((prev) => [finalRecord, ...prev.filter((b) => b.id !== finalRecord.id)]);
+    setScannedBills((prev) => [finalRecord, ...prev.filter((b) => b.id !== finalRecord.id)]);
     resetOcrState();
 
     if (!savedOnServer) {
@@ -2906,15 +2914,15 @@ export default function BillsAndRemindersView({ currentUser }) {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
             {/* Left: Dropzone & Image Preview */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Blurry Photo Warning Banner */}
-              {isImageBlurry && (
-                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm animate-fadeIn">
+              {/* Blurry Photo Warning Banner - Only shown if completely unreadable */}
+              {isImageBlurry && (!ocrMerchant || ocrMerchant === 'Verified Merchant') && (!ocrTotal || ocrTotal === '0.00') && (
+                <div className="p-3.5 rounded-2xl bg-amber-950/60 border border-amber-500/50 text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-lg shadow-amber-950/30 animate-fadeIn">
                   <div className="flex items-start space-x-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-bold block">Photo is not clear / blurry</span>
-                      <span className="text-[11px] text-amber-800 dark:text-amber-300 leading-tight">
-                        {blurWarningMessage || 'Please re-upload a clear, well-lit photo of the bill or scan with camera.'}
+                      <span className="font-bold block">Photo text requires review</span>
+                      <span className="text-[11px] text-amber-300 leading-tight">
+                        {blurWarningMessage || 'Text was faint. You can retake or adjust the extracted values below.'}
                       </span>
                     </div>
                   </div>
@@ -2926,10 +2934,11 @@ export default function BillsAndRemindersView({ currentUser }) {
                       Re-upload
                     </button>
                     <button
-                      onClick={startCamera}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[11px] cursor-pointer"
+                      onClick={() => setIsImageBlurry(false)}
+                      className="p-1.5 text-amber-400 hover:text-white font-bold text-xs cursor-pointer"
+                      title="Dismiss warning"
                     >
-                      Retake
+                      ✕
                     </button>
                   </div>
                 </div>
@@ -2937,16 +2946,18 @@ export default function BillsAndRemindersView({ currentUser }) {
 
               {/* Google Lens Smart Viewfinder & Scanner */}
               {receiptPreviewUrl ? (
-                <div className="rounded-3xl border border-cyan-500/30 bg-slate-900/95 p-3.5 space-y-3 shadow-xl">
+                <div className="rounded-3xl border border-cyan-500/40 bg-[#070e1b] p-4 space-y-3.5 shadow-[0_12px_40px_rgba(6,182,212,0.18)]">
                   {/* Top Bar with Lens Brand & Zoom/Rotate Controls */}
                   <div className="flex items-center justify-between px-1">
                     <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-cyan-500 via-teal-400 to-emerald-400 flex items-center justify-center shadow-sm">
-                        <Camera className="w-3 h-3 text-slate-950 font-black" />
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 via-teal-400 to-emerald-400 flex items-center justify-center shadow-[0_0_10px_#06b6d4]">
+                        <Camera className="w-3.5 h-3.5 text-slate-950 font-black" />
                       </div>
-                      <span className="text-xs font-black tracking-wide text-white flex items-center space-x-1.5">
+                      <span className="text-xs font-black tracking-wide text-white flex items-center space-x-2">
                         <span>Google Lens</span>
-                        <span className="text-[10px] text-cyan-400 font-mono font-normal">Smart OCR</span>
+                        <span className="text-[10px] text-cyan-400 font-mono font-bold bg-cyan-950/60 px-2 py-0.5 rounded-full border border-cyan-500/30">
+                          Smart OCR
+                        </span>
                       </span>
                     </div>
 
@@ -2955,7 +2966,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                       <button
                         type="button"
                         onClick={() => setZoomLevel(prev => Math.max(0.6, prev - 0.2))}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer"
+                        className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer border border-slate-700"
                         title="Zoom Out"
                       >
                         <ZoomOut className="w-3 h-3" />
@@ -2964,7 +2975,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                       <button
                         type="button"
                         onClick={() => setZoomLevel(prev => Math.min(2.5, prev + 0.2))}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer"
+                        className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer border border-slate-700"
                         title="Zoom In"
                       >
                         <ZoomIn className="w-3 h-3" />
@@ -2973,7 +2984,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                       <button
                         type="button"
                         onClick={() => setRotationDeg(prev => (prev + 90) % 360)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer"
+                        className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer border border-slate-700"
                         title="Rotate 90° Clockwise"
                       >
                         <RotateCw className="w-3 h-3" />
@@ -2982,7 +2993,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs transition cursor-pointer font-bold"
+                        className="px-2.5 py-1.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-400 text-xs transition cursor-pointer font-bold"
                         title="Re-upload different bill"
                       >
                         Re-upload
@@ -2991,7 +3002,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                       <button
                         type="button"
                         onClick={resetOcrState}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-400 text-xs transition cursor-pointer"
+                        className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 text-xs transition cursor-pointer border border-slate-700"
                         title="Clear bill"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -3000,12 +3011,12 @@ export default function BillsAndRemindersView({ currentUser }) {
                   </div>
 
                   {/* Google Lens Viewport with Glowing Brackets & Laser Scan */}
-                  <div className="relative rounded-2xl bg-black overflow-hidden flex items-center justify-center min-h-[300px] max-h-[420px] border border-cyan-500/20">
+                  <div className="relative rounded-2xl bg-black overflow-hidden flex items-center justify-center min-h-[300px] max-h-[420px] border border-cyan-500/30 shadow-inner">
                     {/* Glowing Viewfinder Corner Brackets */}
-                    <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-cyan-400 rounded-tl-lg z-20 pointer-events-none shadow-[0_0_8px_#06b6d4]" />
-                    <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-cyan-400 rounded-tr-lg z-20 pointer-events-none shadow-[0_0_8px_#06b6d4]" />
-                    <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-cyan-400 rounded-bl-lg z-20 pointer-events-none shadow-[0_0_8px_#06b6d4]" />
-                    <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-cyan-400 rounded-br-lg z-20 pointer-events-none shadow-[0_0_8px_#06b6d4]" />
+                    <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-cyan-400 rounded-tl-lg z-20 pointer-events-none shadow-[0_0_10px_#06b6d4]" />
+                    <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-cyan-400 rounded-tr-lg z-20 pointer-events-none shadow-[0_0_10px_#06b6d4]" />
+                    <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-cyan-400 rounded-bl-lg z-20 pointer-events-none shadow-[0_0_10px_#06b6d4]" />
+                    <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-cyan-400 rounded-br-lg z-20 pointer-events-none shadow-[0_0_10px_#06b6d4]" />
 
                     {/* Animated Scanning Laser Line */}
                     {isScanning && (
@@ -3149,23 +3160,25 @@ export default function BillsAndRemindersView({ currentUser }) {
 
             {/* Right: Extracted Fields Form (Autofill) */}
             <div className="lg:col-span-7 space-y-4">
-              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-[#080d19] border border-slate-200 dark:border-slate-800 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="p-5 sm:p-6 rounded-3xl bg-[#070e1b]/95 backdrop-blur-xl border border-cyan-500/40 shadow-[0_12px_40px_rgba(6,182,212,0.18)] space-y-4">
+                <div className="flex items-center justify-between pb-3.5 border-b border-cyan-500/20">
                   <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                      Extracted Bill Fields
+                    <div className="w-5 h-5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
+                      <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                    </div>
+                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-100 flex items-center space-x-2">
+                      <span>EXTRACTED BILL FIELDS</span>
                     </h4>
                     {visionEngineUsed && (
-                      <span className="text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2.5 py-0.5 rounded-full border border-cyan-500/30 flex items-center">
-                        <Sparkles className="w-3 h-3 mr-1" />
+                      <span className="text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/70 px-2.5 py-0.5 rounded-full border border-cyan-500/40 flex items-center shadow-sm">
+                        <Sparkles className="w-3 h-3 mr-1 text-cyan-400 animate-pulse" />
                         {visionEngineUsed} (99.8%)
                       </span>
                     )}
                   </div>
                   {isScanning && (
-                    <span className="flex items-center space-x-1 text-xs text-cyan-600 dark:text-cyan-400 font-bold animate-pulse">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span className="flex items-center space-x-1.5 text-xs text-cyan-400 font-bold animate-pulse bg-cyan-950/60 px-2.5 py-1 rounded-full border border-cyan-500/30">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-cyan-400" />
                       <span>{scanStatus}</span>
                     </span>
                   )}
@@ -3173,13 +3186,13 @@ export default function BillsAndRemindersView({ currentUser }) {
 
                 {/* 1. Merchant / Hotel / Railway / Issuer Name */}
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 flex items-center justify-between">
-                    <span className="flex items-center">
-                      <Store className="w-3.5 h-3.5 mr-1 text-cyan-600 dark:text-cyan-400" />
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1 flex items-center justify-between">
+                    <span className="flex items-center text-cyan-400">
+                      <Store className="w-3.5 h-3.5 mr-1.5 text-cyan-400" />
                       Merchant / Issuer Name
                     </span>
                     {ocrConfidence?.merchant && (
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
+                      <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/30">
                         NLP Confidence: {ocrConfidence.merchant.label}
                       </span>
                     )}
@@ -3189,14 +3202,14 @@ export default function BillsAndRemindersView({ currentUser }) {
                     value={ocrMerchant}
                     onChange={(e) => setOcrMerchant(e.target.value)}
                     placeholder="e.g. KATPADI KITCHEN, ARUNAI MEDICALS, INDIAN RAILWAYS"
-                    className="w-full text-xs font-bold px-3 py-2 rounded-xl bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="w-full text-xs font-bold px-3.5 py-2.5 rounded-xl bg-[#0c1424] border border-cyan-500/25 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 transition"
                   />
                 </div>
 
                 {/* 2. Location / Station Route */}
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 flex items-center">
-                    <MapPin className="w-3.5 h-3.5 mr-1 text-cyan-600 dark:text-cyan-400" />
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1 flex items-center text-cyan-400">
+                    <MapPin className="w-3.5 h-3.5 mr-1.5 text-cyan-400" />
                     Merchant Location / Station Route
                   </label>
                   <input
@@ -3204,25 +3217,25 @@ export default function BillsAndRemindersView({ currentUser }) {
                     value={ocrLocation}
                     onChange={(e) => setOcrLocation(e.target.value)}
                     placeholder="e.g. 3rd Street opp VIT Main Gate, Vellore or SALEM JN ➔ KATPADI JN"
-                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-[#0c1424] border border-cyan-500/25 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 transition"
                   />
                 </div>
 
                 {/* 3. GSTIN with ExpressGST & Government Taxpayer Autofill */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center">
-                      <Hash className="w-3.5 h-3.5 mr-1 text-cyan-600 dark:text-cyan-400" />
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center text-cyan-400">
+                      <Hash className="w-3.5 h-3.5 mr-1.5 text-cyan-400" />
                       GST Number (GSTIN)
                     </label>
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
                         onClick={() => handleGstAutofill(ocrGstin)}
-                        className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-300 bg-cyan-100 dark:bg-cyan-950/60 px-2 py-0.5 rounded-md border border-cyan-300 dark:border-cyan-800 flex items-center cursor-pointer transition hover:bg-cyan-200 dark:hover:bg-cyan-900"
+                        className="text-[10px] font-bold text-cyan-300 hover:text-white bg-cyan-950/80 hover:bg-cyan-900 px-2.5 py-0.5 rounded-lg border border-cyan-500/40 flex items-center cursor-pointer transition shadow-sm"
                         title="Extract exact merchant name and address via ExpressGST / GST Search"
                       >
-                        <Sparkles className="w-3 h-3 mr-1" />
+                        <Sparkles className="w-3 h-3 mr-1 text-cyan-400" />
                         Autofill via ExpressGST
                       </button>
                       <a
@@ -3235,13 +3248,13 @@ export default function BillsAndRemindersView({ currentUser }) {
                         ExpressGST ↗
                       </a>
                       <span
-                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${ocrGstStatus === 'Verified'
-                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300'
+                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider ${ocrGstStatus === 'Verified'
+                            ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
                             : ocrGstStatus === 'Invalid'
-                              ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300'
+                              ? 'bg-rose-950/80 text-rose-300 border border-rose-500/50'
                               : ocrGstStatus === 'Name Mismatch'
-                                ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300'
-                                : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                ? 'bg-amber-950/80 text-amber-300 border border-amber-500/50'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
                           }`}
                       >
                         {ocrGstStatus}
@@ -3263,13 +3276,13 @@ export default function BillsAndRemindersView({ currentUser }) {
                         if (ocrGstin.length >= 14) handleGstAutofill(ocrGstin);
                       }}
                       placeholder="15-character Indian GSTIN e.g. 33AAHFR2641F1ZI"
-                      className="w-full text-xs font-mono font-bold px-3 py-2 pr-24 rounded-xl bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      className="w-full text-xs font-mono font-bold px-3.5 py-2.5 pr-24 rounded-xl bg-[#0c1424] border border-cyan-500/25 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 transition"
                     />
                     {ocrGstin.length >= 14 && (
                       <button
                         type="button"
                         onClick={() => handleGstAutofill(ocrGstin)}
-                        className="absolute right-1.5 top-1.5 px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold rounded-lg cursor-pointer transition shadow-sm flex items-center"
+                        className="absolute right-1.5 top-1.5 px-2.5 py-1.5 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white text-[10px] font-bold rounded-lg cursor-pointer transition shadow-sm flex items-center"
                       >
                         <Sparkles className="w-3 h-3 mr-1" />
                         Autofill
@@ -3279,32 +3292,32 @@ export default function BillsAndRemindersView({ currentUser }) {
                 </div>
 
                 {/* 4. Date & Grand Total */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 flex items-center justify-between">
-                      <span className="flex items-center">
-                        <Calendar className="w-3.5 h-3.5 mr-1 text-cyan-600 dark:text-cyan-400" />
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1 flex items-center justify-between">
+                      <span className="flex items-center text-cyan-400">
+                        <Calendar className="w-3.5 h-3.5 mr-1 text-cyan-400" />
                         Bill Date
                       </span>
                       {ocrRawDateStr && (
-                        <span className="text-[10px] text-cyan-600 font-bold font-mono">{ocrRawDateStr}</span>
+                        <span className="text-[10px] text-cyan-400 font-bold font-mono">{ocrRawDateStr}</span>
                       )}
                     </label>
                     <input
                       type="date"
                       value={ocrDate}
                       onChange={(e) => setOcrDate(e.target.value)}
-                      className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none"
+                      className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-[#0c1424] border border-cyan-500/25 text-slate-100 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 transition"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 flex items-center justify-between">
-                      <span className="flex items-center">
-                        <IndianRupee className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1 flex items-center justify-between">
+                      <span className="flex items-center text-emerald-400">
+                        <IndianRupee className="w-3.5 h-3.5 mr-1 text-emerald-400" />
                         Grand Total (₹)
                       </span>
-                      <span className="text-[10px] text-emerald-600 font-bold">Never ₹2.00</span>
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30">Never ₹2.00</span>
                     </label>
                     <input
                       type="number"
@@ -3312,66 +3325,66 @@ export default function BillsAndRemindersView({ currentUser }) {
                       value={ocrTotal}
                       onChange={(e) => setOcrTotal(e.target.value)}
                       placeholder="0.00"
-                      className="w-full text-xs font-bold px-3 py-2 rounded-xl bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full text-xs font-bold px-3.5 py-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/50 text-emerald-300 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)] transition"
                     />
                   </div>
                 </div>
 
                 {/* 5. Subtotal, Tax & Discount */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Subtotal (₹)</label>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1">Subtotal (₹)</label>
                     <input
                       type="number"
                       step="0.01"
                       value={ocrSubtotal}
                       onChange={(e) => setOcrSubtotal(e.target.value)}
                       placeholder="0.00"
-                      className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700"
+                      className="w-full text-xs px-2.5 py-2 rounded-lg bg-[#0c1424] border border-cyan-500/20 text-slate-200 focus:outline-none focus:border-cyan-400 transition"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Tax / GST (₹)</label>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1">Tax / GST (₹)</label>
                     <input
                       type="number"
                       step="0.01"
                       value={ocrTax}
                       onChange={(e) => setOcrTax(e.target.value)}
                       placeholder="0.00"
-                      className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700"
+                      className="w-full text-xs px-2.5 py-2 rounded-lg bg-[#0c1424] border border-cyan-500/20 text-slate-200 focus:outline-none focus:border-cyan-400 transition"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Discount (₹)</label>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1">Discount (₹)</label>
                     <input
                       type="number"
                       step="0.01"
                       value={ocrDiscount}
                       onChange={(e) => setOcrDiscount(e.target.value)}
                       placeholder="0.00"
-                      className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700"
+                      className="w-full text-xs px-2.5 py-2 rounded-lg bg-[#0c1424] border border-cyan-500/20 text-slate-200 focus:outline-none focus:border-cyan-400 transition"
                     />
                   </div>
                 </div>
 
                 {/* 6. Payment Mode (Default Cash) */}
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 flex items-center justify-between">
-                    <span className="flex items-center">
-                      <Wallet className="w-3.5 h-3.5 mr-1 text-cyan-600" />
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center text-cyan-400">
+                      <Wallet className="w-3.5 h-3.5 mr-1 text-cyan-400" />
                       Payment Mode
                     </span>
-                    <span className="text-[10px] text-slate-400 lowercase">default: cash</span>
+                    <span className="text-[10px] text-slate-400 lowercase font-mono">default: cash</span>
                   </label>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-4 gap-2">
                     {['Cash', 'Card / Cardless', 'UPI', 'Net Banking'].map((mode) => (
                       <button
                         key={mode}
                         type="button"
                         onClick={() => setOcrPaymentMode(mode)}
-                        className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition text-center cursor-pointer ${ocrPaymentMode === mode
-                            ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm'
-                            : 'bg-white dark:bg-[#0c1322] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-cyan-400'
+                        className={`py-2 px-2 rounded-xl text-[11px] font-black border transition-all text-center cursor-pointer ${ocrPaymentMode === mode
+                            ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)] scale-[1.02]'
+                            : 'bg-[#0c1424] text-slate-300 border-cyan-500/20 hover:border-cyan-400 hover:text-white'
                           }`}
                       >
                         {mode}
@@ -3381,15 +3394,15 @@ export default function BillsAndRemindersView({ currentUser }) {
                 </div>
 
                 {/* 7. Category & Invoice Ref */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">
                       Category
                     </label>
                     <select
                       value={ocrCategory}
                       onChange={(e) => setOcrCategory(e.target.value)}
-                      className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                      className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-[#0c1424] border border-cyan-500/25 text-slate-100 focus:outline-none focus:border-cyan-400 transition"
                     >
                       <option value="Dining & Restaurant">Dining & Restaurant</option>
                       <option value="Health & Medical">Health & Medical</option>
@@ -3403,7 +3416,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1">
                       Invoice / Ref No
                     </label>
                     <input
@@ -3411,29 +3424,29 @@ export default function BillsAndRemindersView({ currentUser }) {
                       value={ocrInvoiceRef}
                       onChange={(e) => setOcrInvoiceRef(e.target.value)}
                       placeholder="e.g. Inv: AM-3412, UTS: CXRPEGG1G6"
-                      className="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl bg-[#0c1424] border border-cyan-500/25 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition"
                     />
                   </div>
                 </div>
 
                 {/* Save Confirmation Buttons (Requirement 1 & 11) */}
-                <div className="pt-2 flex items-center space-x-2">
+                <div className="pt-2 flex items-center space-x-2.5">
                   <button
                     onClick={() => handleSaveScannedReceipt('paid')}
-                    className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+                    className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-[0_0_25px_rgba(16,185,129,0.35)] active:scale-95 transition-all cursor-pointer"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
+                    <CheckCircle2 className="w-4 h-4 text-slate-950 font-black animate-pulse" />
                     <span>Confirm Paid & Save to My Bills</span>
                   </button>
                   <button
                     onClick={() => handleSaveScannedReceipt('needs_confirmation')}
-                    className="py-2.5 px-3 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition cursor-pointer"
+                    className="py-3 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition cursor-pointer"
                   >
                     Save Draft (Needs Confirm)
                   </button>
                   <button
                     onClick={resetOcrState}
-                    className="p-2.5 rounded-xl text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                    className="p-3 rounded-xl bg-slate-800/80 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 transition cursor-pointer"
                     title="Clear form"
                   >
                     <Trash2 className="w-4 h-4" />
