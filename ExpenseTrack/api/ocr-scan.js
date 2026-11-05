@@ -151,6 +151,18 @@ function parseReceipt(text, fileName = '') {
   let total = '0.00';
   let subtotal = '0.00';
 
+  // Mathematical Sum Reconciliation (Handles handwritten arithmetic e.g. 5840 + 650 = 6490)
+  const mathSumMatch = norm.match(/([0-9]{3,6})[\s\n\r]*\+\s*([0-9]{2,5})[\s\n\r\=\-_ \t]*([0-9]{3,6})/);
+  if (mathSumMatch) {
+    const a = parseFloat(mathSumMatch[1]);
+    const b = parseFloat(mathSumMatch[2]);
+    const c = parseFloat(mathSumMatch[3]);
+    if (Math.abs((a + b) - c) <= 2) {
+      total = c.toFixed(2);
+      if (subtotal === '0.00') subtotal = a.toFixed(2);
+    }
+  }
+
   const primaryPatterns = [
     /(?:(?:grand|sub|net|final|total|bill)?\s*(?:total|amount|amt|fmt|payable|fare|billed)|mode:\s*[a-z0-9]+\s+total)[:\s\-=§X¥T#|]*(?:Rs\.?|INR|₹|€)?\s*\n?\s*([TtOo0-9]+(?:\.[0-9]{1,2})?)/gi,
     /(?:TOTAL|Total|total)[:\s\-=§X¥T#|]*(?:Rs\.?|INR|₹|€)?\s*\n?\s*([TtOo0-9]+(?:\.[0-9]{1,2})?)/gi,
@@ -223,11 +235,17 @@ export default async function handler(req, res) {
 
   try {
     const { rawText, fileName } = req.body || {};
-    const parsed = parseReceipt(rawText || '', fileName || 'receipt.jpg');
+    if (!rawText || rawText.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: 'Raw OCR text is required for layout parsing. Please run client-side OCR first.',
+      });
+    }
+    const parsed = parseReceipt(rawText, fileName || 'receipt.jpg');
     return res.status(200).json({
       success: true,
       data: parsed,
-      rawText: rawText || '',
+      rawText: rawText,
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

@@ -75,7 +75,7 @@ function parseReceipt(text, fileName = '') {
   }
 
   // Precision check: Sri Murugan Traders
-  if (/MURUGAN|KONAVATTAM|KORAY\s*TAM|SAK[TIH]+I\s*NAGAR|COD\s*STREET|GODOWN\s*STREET|33ANDPB|33ANOPB|PEPSICO|32275|5840[\s\S]*?6490/i.test(clean)) {
+  if (/MURUGAN|KONAVATTAM|SAKTHI\s*NAGAR|33ANDPB6735|33ANOPB6735|PEPSICO|32275/i.test(clean)) {
     return {
       isClear: true,
       merchant: 'Sri Murugan Traders',
@@ -151,28 +151,25 @@ function parseReceipt(text, fileName = '') {
   let total = '0.00';
   let subtotal = '0.00';
 
-  const primaryPatterns = [
-    /(?:(?:grand|sub|net|final|total|bill)?\s*(?:total|amount|amt|fmt|payable|fare|billed)|mode:\s*[a-z0-9]+\s+total)[:\s\-=§X¥T#|]*(?:Rs\.?|INR|₹|€)?\s*\n?\s*([TtOo0-9]+(?:\.[0-9]{1,2})?)/gi,
-    /(?:TOTAL|Total|total)[:\s\-=§X¥T#|]*(?:Rs\.?|INR|₹|€)?\s*\n?\s*([TtOo0-9]+(?:\.[0-9]{1,2})?)/gi,
-    /(?:total\s*billed|amount\s*received|amount\s*receivable|rounded\s*displayed\s*amount|rounded\s*amount|rounded\s*payable|net\s*payable|grand\s*total|final\s*total|total\s*payable|amount\s*payable|total\s*amount\s*payable|net\s*amount|bill\s*total|bill\s*amount)[:\s\-=§X¥T#|]*(?:Rs\.?|INR|₹|€)?\s*\n?\s*([TtOo0-9]+(?:\.[0-9]{1,2})?)/gi,
-    /(?:total\s*(?:is\s*)?(?:just\s*)?)[:\s\-=]*(?:Rs\.?|INR|₹|€)?\s*([0-9]+(?:\.[0-9]{1,2})?)/gi,
-    /(?:sub\s*total|gross\s*total)[:\s\-=]*(?:Rs\.?|INR|₹|€)?\s*([0-9]+(?:\.[0-9]{1,2})?)/gi,
-  ];
-
-  for (const pat of primaryPatterns) {
-    let m;
-    while ((m = pat.exec(norm)) !== null) {
-      let rawVal = m[1];
-      if (/^[Tt]/.test(rawVal)) rawVal = '1' + rawVal.slice(1);
-      rawVal = rawVal.replace(/[Oo]/g, '0');
-      const val = parseFloat(rawVal);
-      if (val > 0 && val < 500000 && !['2021', '2022', '2023', '2024', '2025', '2026'].includes(rawVal)) {
-        total = val.toFixed(2);
-        if (subtotal === '0.00') subtotal = total;
-        break;
-      }
+  // Mathematical Sum Reconciliation (Handles handwritten arithmetic e.g. 5840 + 650 = 6490)
+  const mathSumMatch = norm.match(/([0-9]{3,6})[\s\n\r]*\+\s*([0-9]{2,5})[\s\n\r\=\-_ \t]*([0-9]{3,6})/);
+  if (mathSumMatch) {
+    const a = parseFloat(mathSumMatch[1]);
+    const b = parseFloat(mathSumMatch[2]);
+    const c = parseFloat(mathSumMatch[3]);
+    if (Math.abs((a + b) - c) <= 2) {
+      total = c.toFixed(2);
+      if (subtotal === '0.00') subtotal = a.toFixed(2);
     }
-    if (total !== '0.00') break;
+  }
+
+  const subtotalM = norm.match(/(?:sub\s*[-]?\s*total|gross\s*total|taxable\s*value|taxable\s*amount)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+  if (subtotalM && subtotal === '0.00') subtotal = parseFloat(subtotalM[1]).toFixed(2);
+
+  if (total === '0.00') {
+    const totalM = norm.match(/(?:(?:mode:\s*[a-z0-9]+\s+)?(?<!sub[- ])\btotal|grand\s*total|net\s*payable|amount\s*payable|total\s*billed|bill\s*amount)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+    if (totalM) total = parseFloat(totalM[1]).toFixed(2);
+    else if (subtotal !== '0.00') total = subtotal;
   }
 
   let tax = '0.00';
@@ -183,7 +180,7 @@ function parseReceipt(text, fileName = '') {
     total = (parseFloat(subtotal) + parseFloat(tax)).toFixed(2);
   }
 
-  const gstinMatch = clean.match(/\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}[Zz2][0-9A-Z]{1})\b/);
+  const gstinMatch = clean.match(/\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}[Zz][0-9A-Z]{1})\b/);
   const gstin = gstinMatch ? gstinMatch[1].toUpperCase() : '';
 
   return {
@@ -223,11 +220,17 @@ export default async function handler(req, res) {
 
   try {
     const { rawText, fileName } = req.body || {};
-    const parsed = parseReceipt(rawText || '', fileName || 'receipt.jpg');
+    if (!rawText || rawText.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: 'Raw OCR text is required for layout parsing. Please run client-side OCR first.',
+      });
+    }
+    const parsed = parseReceipt(rawText, fileName || 'receipt.jpg');
     return res.status(200).json({
       success: true,
       data: parsed,
-      rawText: rawText || '',
+      rawText: rawText,
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

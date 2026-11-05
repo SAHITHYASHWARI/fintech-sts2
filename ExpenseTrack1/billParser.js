@@ -232,14 +232,12 @@ const isNonMonetaryContext = (line, matchedNumber) => {
 const extractGrandTotal = (normText, cleanText) => {
   // Strategy 1: Explicit Grand Total / Rounded / Net Payable labels (supports multi-line and garbled currency symbols)
   const primaryPatterns = [
-    /(?:(?:grand|sub|net|total|bill)?\s*(?:total|amount|amt|fmt|payable|fare|billed))[:\s\-=]*(?:Rs\.?|INR|₹|€)?\s*([TtOo0-9]+(?:\.[0-9]{1,2})?)/gi,
-    /(?:TOTAL|Total|total)[:\s\-=]*(?:Rs\.?|INR|₹|€)?\s*([TtOo0-9]+(?:\.[0-9]{1,2})?)/gi,
-    /(?:total\s*billed|amount\s*received|amount\s*receivable|net\s*payable|grand\s*total|final\s*total|total\s*payable|amount\s*payable|total\s*amount\s*payable|net\s*amount|bill\s*total|bill\s*amount|sub\s*taxable\s*\+\s*tax|rounded\s*displayed\s*amount|rounded\s*amount|rounded\s*payable)[:\s\-=]*(?:Rs\.?|INR|₹|€)?\s*([TtOo0-9]+(?:\.[0-9]{1,2})?)/gi,
-    /(?:total\s*(?:is\s*)?(?:just\s*)?)[:\s\-=]*(?:Rs\.?|INR|₹|€)?\s*([0-9]+(?:\.[0-9]{1,2})?)/gi,
+    /(?:total\s*billed|amount\s*received|amount\s*receivable|net\s*payable|grand\s*total|final\s*total|total\s*payable|amount\s*payable|total\s*amount\s*payable|net\s*amount|bill\s*total|bill\s*amount|sub\s*taxable\s*\+\s*tax|rounded\s*displayed\s*amount|rounded\s*amount|rounded\s*payable)[\s\:\=\-₹Rs.§\|\.\_\(\)\[\]X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/gi,
+    /(?:(?:mode:\s*[a-z0-9]+\s+)?(?<!sub[- ])\btotal)[:\s\-=₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/gi,
     /(?:5840\s*\+\s*650|5840[\s\S]*?\+650)[\s\S]*?([0-9]{4})/i,
     /(?:Rupees\s+EIGHT\s+HUNDRED\s+SEVENTY\s+AND\s+ELEVEN)[\s\S]*?([0-9]+(?:\.[0-9]{1,2})?)/i,
-    /(?:total\s*fare|ticket\s*fare|fare)[:\s\-=]*(?:Rs\.?|INR|₹|€)?\s*([0-9]+(?:\.[0-9]{1,2})?)/gi,
-    /(?:cash|net\s*billed|total\s*charges|total\s*invoice\s*amount|gross\s*total)[:\s\-=]*(?:Rs\.?|INR|₹|€)?\s*([0-9]+(?:\.[0-9]{1,2})?)/gi,
+    /(?:total\s*fare|ticket\s*fare|fare)[\s\:\=\-₹Rs.§]*([0-9]+(?:\.[0-9]{1,2})?)/gi,
+    /(?:cash|net\s*billed|total\s*charges|total\s*invoice\s*amount|gross\s*total)[\s\:\=\-₹Rs.§]*([0-9]+(?:\.[0-9]{1,2})?)/gi,
   ];
 
   let bestPrimary = null;
@@ -247,11 +245,8 @@ const extractGrandTotal = (normText, cleanText) => {
     let match;
     pat.lastIndex = 0;
     while ((match = pat.exec(normText)) !== null) {
-      let rawAmt = match[1];
-      if (/^[Tt]/.test(rawAmt)) rawAmt = '1' + rawAmt.slice(1);
-      rawAmt = rawAmt.replace(/[Oo]/g, '0');
       const lineWithMatch = normText.split('\n').find(l => l.includes(match[1]));
-      const val = safeParseAmount(rawAmt);
+      const val = safeParseAmount(match[1]);
       if (val !== null && val > 0 && !isNonMonetaryContext(lineWithMatch, val)) {
         if (bestPrimary === null || val > bestPrimary) {
           bestPrimary = val;

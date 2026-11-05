@@ -73,12 +73,8 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const body = req.body || {};
-      let grand_total = parseFloat(body.grand_total || body.amount) || 0;
+      const grand_total = Math.max(0, parseFloat(body.grand_total || body.amount) || 0);
       const merchant_name = (body.merchant_name || body.merchant || 'Verified Merchant').trim();
-
-      if (grand_total <= 0) {
-        grand_total = 1.00; // Safeguard so saving is never rejected
-      }
 
       const billRecord = {
         id: `bill-${Date.now()}-${Math.floor(Math.random() * 1000)}`,

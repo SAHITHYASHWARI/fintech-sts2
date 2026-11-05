@@ -142,10 +142,8 @@ function normalizeGSTINCandidate(raw) {
   // Pos 11: PAN letter
   if (chars[11] === '0') chars[11] = 'O';
   if (chars[11] === '1') chars[11] = 'I';
-  if (chars[11] === '6') chars[11] = 'G';
   if (chars[11] === '8') chars[11] = 'B';
   if (chars[11] === '5') chars[11] = 'S';
-  if (chars[11] === '2') chars[11] = 'Z';
 
   // Pos 12: Entity digit/char (typically 1)
   if (chars[12] === 'I' || chars[12] === 'L') chars[12] = '1';

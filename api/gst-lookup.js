@@ -3,6 +3,15 @@
  */
 
 const VERIFIED_ENTERPRISE_REGISTRY = {
+  '29AADCL1443Q1Z2': {
+    tradeName: 'Hotel Dhruvathare',
+    legalName: 'Hotel Dhruvathare (Vegetarian Restaurant)',
+    address: '121, Kalinganahalli Grama, Bellur Hobli, Nagamangala, Mandya, Yediyur, Karnataka - 572142',
+    pincode: '572142',
+    status: 'Active',
+    verified: true,
+    category: 'Hotel & Lodging',
+  },
   '33AAATS0944D1ZX': {
     legalName: 'Schieffelin Institute of Health - Research & Leprosy Centre (SIH - R & LC), Karigiri',
     tradeName: 'SIH - R & LC, Karigiri',
