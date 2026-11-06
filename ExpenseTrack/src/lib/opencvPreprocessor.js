@@ -114,15 +114,35 @@ export async function processBillImageOpenCV(dataUrl) {
       // R, G, B enhancement
       for (let c = 0; c < 3; c++) {
         let val = d[i + c] + shadowGain * (128 - d[i + c]);
-        // Contrast stretching
+        // Moderate contrast stretching to preserve natural appearance
         val = (val - 128) * contrastFactor + 128;
         d[i + c] = Math.min(255, Math.max(0, val));
       }
     }
   }
 
-  // 4. Unsharp Masking Kernel (Sharpen faint text, dot-matrix dots, and decimal points)
-  // 3x3 Sharpening matrix applied on luminance
+  // 4. Edge-Preserving De-Blur & Sharpening (Unsharp Masking)
+  // Extracts fine letter strokes and sharpens characters while keeping the image natural
+  const copyData = new Uint8ClampedArray(d);
+  const sharpenAmount = 0.45; // balanced de-blur strength
+
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = (y * w + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const center = copyData[idx + c];
+        const up = copyData[((y - 1) * w + x) * 4 + c];
+        const down = copyData[((y + 1) * w + x) * 4 + c];
+        const left = copyData[(y * w + (x - 1)) * 4 + c];
+        const right = copyData[(y * w + (x + 1)) * 4 + c];
+
+        // Laplacian high-pass
+        const laplacian = 4 * center - (up + down + left + right);
+        d[idx + c] = Math.min(255, Math.max(0, center + sharpenAmount * laplacian));
+      }
+    }
+  }
+
   ctx.putImageData(imgData, 0, 0);
   const enhancedUrl = canvas.toDataURL('image/jpeg', 0.95);
 
@@ -177,3 +197,4 @@ export async function processBillImageOpenCV(dataUrl) {
     height: h,
   };
 }
+

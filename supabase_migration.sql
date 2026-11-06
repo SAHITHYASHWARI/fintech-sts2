@@ -124,3 +124,4 @@ CREATE POLICY "Public Update Bills Bucket" ON storage.objects
 
 CREATE POLICY "Public Delete Bills Bucket" ON storage.objects
     FOR DELETE USING (bucket_id = 'bills');
+

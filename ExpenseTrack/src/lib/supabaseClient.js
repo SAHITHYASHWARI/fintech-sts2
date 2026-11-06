@@ -70,3 +70,4 @@ export async function uploadImageToSupabaseStorage(imageData, fileName) {
     return null;
   }
 }
+

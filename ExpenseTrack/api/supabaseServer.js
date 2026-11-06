@@ -70,3 +70,4 @@ export async function uploadBillImageToStorage(base64Data, filePath) {
     return null;
   }
 }
+

@@ -1915,18 +1915,22 @@ export default function BillsAndRemindersView({ currentUser }) {
       setIsImageBlurry(false);
       setBlurWarningMessage('');
 
-      // Build bounding boxes for visual overlay
+      // Build visual overlay chips covering 100% of the entire bill (top to bottom)
       const lines = (ocrResult.rawText || fullText).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       const boxes = [];
-      lines.slice(0, 30).forEach((line, idx) => {
+      const totalLines = Math.max(1, lines.length);
+
+      lines.forEach((line, idx) => {
+        // Spans smoothly from 3% (header) down to 96% (footer & terms) without cutting off!
+        const topPct = 3 + (idx / totalLines) * 93;
         boxes.push({
           id: `box-${idx}`,
           text: line,
           confidence: 96,
-          pctLeft: 8,
-          pctTop: 8 + (idx / Math.max(1, lines.length)) * 82,
-          pctWidth: Math.min(84, Math.max(20, line.length * 2.2)),
-          pctHeight: 2.4,
+          pctLeft: 6,
+          pctTop: topPct,
+          pctWidth: Math.min(88, Math.max(25, line.length * 2.3)),
+          pctHeight: Math.max(1.6, Math.min(3.2, 85 / totalLines)),
         });
       });
       setDetectedBoxes(boxes);
@@ -2011,7 +2015,8 @@ export default function BillsAndRemindersView({ currentUser }) {
     const d = preset.data;
     setOcrMerchant(d.merchant);
     setOcrLocation(d.location);
-    setOcrGstin(d.gstin);
+    setOcrGstin(d.gstin || '');
+    setOcrSupplierGstin(d.gstin || '');
     setOcrGstStatus(d.gst_verification_status || (d.gstin ? 'Verified' : 'GSTIN Not Provided'));
     setOcrBillType(d.billTypeLabel);
     setOcrDate(d.date);
