@@ -17,6 +17,8 @@
     "expense-tracker"
   ],
   "author": "SAHITHYASHWARI",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.0"
+  }
 }
-

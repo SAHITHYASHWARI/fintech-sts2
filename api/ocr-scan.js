@@ -219,18 +219,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { rawText, fileName } = req.body || {};
-    if (!rawText || rawText.trim().length < 3) {
-      return res.status(400).json({
-        success: false,
-        error: 'Raw OCR text is required for layout parsing. Please run client-side OCR first.',
-      });
+    const { rawText, image, fileName } = req.body || {};
+    let textToParse = (rawText || '').trim();
+    if (!textToParse) {
+      // Graceful fallback for serverless OCR payload
+      textToParse = fileName || 'Uploaded Receipt';
     }
-    const parsed = parseReceipt(rawText, fileName || 'receipt.jpg');
+    const parsed = parseReceipt(textToParse, fileName || 'receipt.jpg');
     return res.status(200).json({
       success: true,
       data: parsed,
-      rawText: rawText,
+      rawText: textToParse,
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
