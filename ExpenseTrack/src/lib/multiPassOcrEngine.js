@@ -91,7 +91,14 @@ const CONFUSABLES = {
  */
 export function normalizeAndCorrectGSTIN(raw) {
   if (!raw) return { gstin: '', isValid: false, original: '', confidence: 0 };
-  let s = String(raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
+
+  // PRE-PROCESSING: Handle OCR slash/backslash noise BEFORE stripping non-alphanumeric
+  // OCR frequently reads digit '7' as '/' especially in Arunai-style thermal receipts
+  let s = String(raw).toUpperCase()
+    .replace(/\//g, '7')     // slash → 7 (CRITICAL for Arunai: T3OMOFSE/67AI2V)
+    .replace(/\\/g, '7')     // backslash → 7
+    .replace(/[^0-9A-Z]/g, '');
+
   if (s.length < 13) return { gstin: '', isValid: false, original: raw, confidence: 0 };
   if (s.length === 14) s = s + 'Z';
   if (s.length > 15) s = s.slice(0, 15);
@@ -100,12 +107,12 @@ export function normalizeAndCorrectGSTIN(raw) {
   const chars = [...rawChars];
 
   // 1. First 2 characters: State Code (Digits 0-9)
-  if (chars[0] === 'T' || chars[0] === 'S') chars[0] = '3';
-  if (chars[1] === 'S' || chars[1] === 'T') chars[1] = '3';
-  if (chars[0] === 'O' || chars[0] === 'D' || chars[0] === 'Q') chars[0] = '0';
-  if (chars[1] === 'O' || chars[1] === 'D' || chars[1] === 'Q') chars[1] = '0';
-  if (chars[0] === 'I' || chars[0] === 'L') chars[0] = '1';
-  if (chars[1] === 'I' || chars[1] === 'L') chars[1] = '1';
+  if ('TSE'.includes(chars[0])) chars[0] = '3';
+  if ('TSE'.includes(chars[1])) chars[1] = '3';
+  if ('ODQ'.includes(chars[0])) chars[0] = '0';
+  if ('ODQ'.includes(chars[1])) chars[1] = '0';
+  if ('IL'.includes(chars[0])) chars[0] = '1';
+  if ('IL'.includes(chars[1])) chars[1] = '1';
   if (chars[0] === 'Z') chars[0] = '2';
   if (chars[1] === 'Z') chars[1] = '2';
 
@@ -119,11 +126,15 @@ export function normalizeAndCorrectGSTIN(raw) {
   }
 
   // 3. Next 4 characters: PAN Numbers (chars 7 to 10)
+  // Extended digit confusable map — covers common OCR misreads in thermal/mobile photos
   for (let i = 7; i <= 10; i++) {
-    if (['O', 'D', 'Q'].includes(chars[i])) chars[i] = '0';
+    if (['O', 'D', 'Q', 'C'].includes(chars[i])) chars[i] = '0';
     if (['I', 'L', 'T'].includes(chars[i])) chars[i] = '1';
     if (chars[i] === 'Z') chars[i] = '2';
+    if (['E', 'F'].includes(chars[i])) chars[i] = '3'; // E/F → 3 (key fix for Arunai: 'E' at digit positions)
+    if (chars[i] === 'A') chars[i] = '4';              // A → 4
     if (chars[i] === 'S') chars[i] = '5';
+    if (chars[i] === 'G') chars[i] = '6';              // G → 6
     if (chars[i] === 'B') chars[i] = '8';
   }
 
@@ -225,40 +236,45 @@ export function extractAllGSTINs(fullText) {
   const candidates = [];
   const totalLines = Math.max(1, lines.length);
 
-  // Pattern 1: Explicit labels with 15-character string
-  const labelRegex = /(?:GSTIN|GST\s*NO\.?|GST\s*NUMBER|GST|TIN|UIN)[\s\:\=\#\.\-]*([0-9A-Za-z]{14,16})\b/gi;
+  // Pattern 1: Broad label regex catches OCR variants: "BST ND:", "GST NO:", "GST IN:", etc.
+  const labelRegex = /(?:[GB]S[TI](?:\s*N[O0D]?)?|GSTIN|TIN|UIN|DL\.?NO[^:]{0,30}GST\s*N[O0D]?)[:\s\=\#\.\-]*([0-9A-Za-z]{12,18})/gi;
 
-  // Pattern 2: Standalone 15-character token with Indian GST structure
-  const standaloneRegex = /\b([0-9OISB]{2}[A-Za-z0158]{5}[0-9OISB]{4}[A-Za-z0158]{1}[0-9A-Za-z]{1}[Zz2][0-9A-Za-z]{1})\b/g;
+  // Pattern 2: Standalone 15-character token — expanded state code char class (T/E/S/Z for digit confusion)
+  const standaloneRegex = /\b([0-9TOISBZE]{2}[A-Za-z0158]{5}[0-9OISB]{4}[A-Za-z0158]{1}[0-9A-Za-z]{1}[Zz2][0-9A-Za-z]{1})\b/g;
 
   lines.forEach((line, idx) => {
     const verticalPos = idx / totalLines;
     const nearby = lines.slice(Math.max(0, idx - 2), Math.min(totalLines, idx + 3)).join(' ').toLowerCase();
     const isCustomer = /buyer|customer|billed\s*to|recipient|client/i.test(nearby);
 
+    // Pre-clean the line: replace slashes → 7 so "33CMOPS3/67A1ZV" becomes "33CMOPS3767A1ZV"
+    const cleanLine = line.replace(/\//g, '7').replace(/\\/g, '7');
+
     // Check label regex
     let m;
-    while ((m = labelRegex.exec(line)) !== null) {
+    while ((m = labelRegex.exec(cleanLine)) !== null) {
       const parsed = normalizeAndCorrectGSTIN(m[1]);
       const stateCode = parsed.gstin.slice(0, 2);
       if (GST_STATE_MAP[stateCode]) {
-        candidates.push({
-          gstin: parsed.gstin,
-          rawMatch: m[1],
-          lineIndex: idx,
-          verticalPos,
-          isCustomer,
-          stateCode,
-          stateName: GST_STATE_MAP[stateCode],
-          isChecksumValid: parsed.isValid,
-          confidence: parsed.confidence,
-        });
+        if (!candidates.some((c) => c.gstin === parsed.gstin)) {
+          candidates.push({
+            gstin: parsed.gstin,
+            rawMatch: m[1],
+            lineIndex: idx,
+            verticalPos,
+            isCustomer,
+            stateCode,
+            stateName: GST_STATE_MAP[stateCode],
+            isChecksumValid: parsed.isValid,
+            confidence: parsed.confidence,
+          });
+        }
       }
     }
 
-    // Check standalone regex
+    // Check standalone regex on cleaned line
     let sm;
-    while ((sm = standaloneRegex.exec(line)) !== null) {
+    while ((sm = standaloneRegex.exec(cleanLine)) !== null) {
       const parsed = normalizeAndCorrectGSTIN(sm[1]);
       const stateCode = parsed.gstin.slice(0, 2);
       if (GST_STATE_MAP[stateCode] && !candidates.some((c) => c.gstin === parsed.gstin)) {
@@ -273,6 +289,30 @@ export function extractAllGSTINs(fullText) {
           isChecksumValid: parsed.isValid,
           confidence: parsed.confidence,
         });
+      }
+    }
+
+    // Sliding-window word scan: try every word ≥ 13 chars as a GSTIN candidate
+    // Catches cases where the token is on its own line without any label
+    const words = cleanLine.replace(/[^A-Z0-9\s]/gi, ' ').split(/\s+/);
+    for (const word of words) {
+      const w = word.trim();
+      if (w.length >= 13 && w.length <= 17) {
+        const parsed = normalizeAndCorrectGSTIN(w);
+        const stateCode = parsed.gstin.slice(0, 2);
+        if (GST_STATE_MAP[stateCode] && !candidates.some((c) => c.gstin === parsed.gstin)) {
+          candidates.push({
+            gstin: parsed.gstin,
+            rawMatch: w,
+            lineIndex: idx,
+            verticalPos,
+            isCustomer,
+            stateCode,
+            stateName: GST_STATE_MAP[stateCode],
+            isChecksumValid: parsed.isValid,
+            confidence: parsed.confidence - 10, // slight penalty for no label
+          });
+        }
       }
     }
   });
@@ -305,7 +345,7 @@ export function extractAllGSTINs(fullText) {
  * Extracts: Merchant, Address, Date, Invoice No, Subtotal, Taxes, Discounts, and Grand Total.
  * Uses layout hierarchy and arithmetic reconciliation (Subtotal + Tax - Discount = Total).
  */
-export function extractStructuredFinancialFields(mainText, footerText, gstinInfo, fileName = '') {
+export function extractStructuredFinancialFields(mainText, footerText, gstinInfo, fileName = '', topBBoxLines = []) {
   const combinedText = `${mainText}\n${footerText}`;
   const lines = combinedText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const norm = combinedText.replace(/(\d),(\d)/g, '$1$2').replace(/(\d),(\d)/g, '$1$2');
@@ -315,14 +355,48 @@ export function extractStructuredFinancialFields(mainText, footerText, gstinInfo
   // ═════════════════════════════════════════════════════════════════════════
   let supplierName = '';
 
-  // Look through top 8 lines for the prominent trade name
   const ignoredHeaderKeywords = /^(?:tax\s*invoice|retail\s*invoice|invoice|bill|cash\s*bill|cash\s*memo|estimate|receipt|quotation|original|duplicate|triplicate|welcome|thank\s*you|customer|table|order|date|gstin|phone|tel|cin|pan|dl\.?no)/i;
+  const addressPatterns = /\b(?:street|road|nagar|floor|complex|taluk|dist|lane|cross|stand|near|opp|\d{6})\b/i;
+  const businessKeywords = /\b(pharmacy|medical|medicals?|cotton|kitchen|restaurant|hotel|stores?|mart|traders?|enterprises?|pvt\.?\s*ltd|hospital|clinic|bakery|salon|centre|center|foods?|systems?|services?|agency|agencies|electricals?|hardware|chemicals?|textiles?|garments?)\b/i;
 
-  for (let i = 0; i < Math.min(8, lines.length); i++) {
-    const l = lines[i].replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
-    if (l.length >= 3 && !ignoredHeaderKeywords.test(l) && !/^\d+$/.test(l)) {
-      supplierName = l;
-      break;
+  // Strategy 1: Use bounding-box-sorted top lines (most reliable — these are sorted by physical Y position)
+  for (const bLine of topBBoxLines) {
+    const l = bLine.replace(/[^\w\s\.\&\-\/\(\)]/g, '').trim();
+    if (l.length < 3 || l.length > 65) continue;
+    if (ignoredHeaderKeywords.test(l)) continue;
+    if (addressPatterns.test(l)) continue;
+    if (/^\d+$/.test(l)) continue;
+    supplierName = l;
+    break;
+  }
+
+  // Strategy 2: Scan ALL lines for a business-keyword match (catches "MASHA PHARMACY", "RAMRAJ COTTON" etc.)
+  if (!supplierName) {
+    for (const line of lines) {
+      if (
+        businessKeywords.test(line) &&
+        line.length <= 70 &&
+        !ignoredHeaderKeywords.test(line) &&
+        !/^(Customer|Address|Contact|Doctor|Buyer):/i.test(line) &&
+        !addressPatterns.test(line)
+      ) {
+        const cleaned = line.replace(/[^\w\s\.\&\-\/\(\)]/g, '').trim();
+        if (cleaned.length >= 3 && cleaned.length <= 65) {
+          supplierName = cleaned;
+          break;
+        }
+      }
+    }
+  }
+
+  // Strategy 3: Original top-8-lines fallback
+  if (!supplierName) {
+    for (let i = 0; i < Math.min(8, lines.length); i++) {
+      const l = lines[i].replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
+      if (l.length >= 3 && !ignoredHeaderKeywords.test(l) && !/^\d+$/.test(l)) {
+        supplierName = l;
+        break;
+      }
     }
   }
 
@@ -579,6 +653,7 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
   let pass2Text = '';
   let pass3FooterText = '';
   let combinedLines = [];
+  let topBBoxLines = []; // Bounding-box sorted top lines for accurate merchant detection
 
   // Pass 1: Original Image OCR
   onProgress({ stage: 2, percent: 35, status: 'Pass 1/3: Scanning full original document...' });
@@ -591,7 +666,15 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
       },
     });
     pass1Text = p1.data?.text || '';
-    if (p1.data?.lines) combinedLines.push(...p1.data.lines);
+    if (p1.data?.lines) {
+      combinedLines.push(...p1.data.lines);
+      // Build bounding-box-sorted top lines for merchant extraction (most reliable for header)
+      topBBoxLines = [...p1.data.lines]
+        .filter(l => l.confidence > 20 && l.text && l.text.trim().length > 1)
+        .sort((a, b) => a.bbox.y0 - b.bbox.y0)
+        .slice(0, 15)
+        .map(l => l.text.trim());
+    }
   } catch (err) {
     console.warn('Pass 1 OCR warning:', err);
   }
@@ -652,7 +735,8 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
     primaryCleanText,
     pass3FooterText,
     gstinResult,
-    fileName
+    fileName,
+    topBBoxLines
   );
 
   onProgress({ stage: 6, percent: 100, status: 'Complete! All bill sections extracted.' });

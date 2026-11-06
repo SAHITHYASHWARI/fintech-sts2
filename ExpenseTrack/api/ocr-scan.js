@@ -64,7 +64,11 @@ const CONFUSABLES = {
 
 function normalizeAndCorrectGSTIN(raw) {
   if (!raw) return { gstin: '', isValid: false };
-  let s = String(raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
+  // PRE-PROCESSING: slash/backslash → 7 BEFORE stripping (OCR reads digit 7 as slash in thermal receipts)
+  let s = String(raw).toUpperCase()
+    .replace(/\//g, '7')
+    .replace(/\\/g, '7')
+    .replace(/[^0-9A-Z]/g, '');
   if (s.length < 13) return { gstin: '', isValid: false };
   if (s.length === 14) s = s + 'Z';
   if (s.length > 15) s = s.slice(0, 15);
@@ -73,10 +77,10 @@ function normalizeAndCorrectGSTIN(raw) {
   const chars = [...rawChars];
 
   // State code digits
-  if (chars[0] === 'T' || chars[0] === 'S') chars[0] = '3';
-  if (chars[1] === 'S' || chars[1] === 'T') chars[1] = '3';
+  if ('TSE'.includes(chars[0])) chars[0] = '3';
+  if ('TSE'.includes(chars[1])) chars[1] = '3';
   if (['O', 'D', 'Q'].includes(chars[0])) chars[0] = '0';
-  if (['I', 'L', 'T'].includes(chars[0])) chars[0] = '1';
+  if (['I', 'L'].includes(chars[0])) chars[0] = '1';
   if (chars[0] === 'Z') chars[0] = '2';
 
   if (['O', 'D', 'Q'].includes(chars[1])) chars[1] = '0';
@@ -92,11 +96,15 @@ function normalizeAndCorrectGSTIN(raw) {
     if (chars[i] === '2') chars[i] = 'Z';
   }
 
-  // PAN numbers
+  // PAN numbers — extended digit confusion map
   for (let i = 7; i < 11; i++) {
-    if (['O', 'D', 'Q'].includes(chars[i])) chars[i] = '0';
-    if (['I', 'L'].includes(chars[i])) chars[i] = '1';
+    if (['O', 'D', 'Q', 'C'].includes(chars[i])) chars[i] = '0';
+    if (['I', 'L', 'T'].includes(chars[i])) chars[i] = '1';
+    if (chars[i] === 'Z') chars[i] = '2';
+    if (['E', 'F'].includes(chars[i])) chars[i] = '3'; // E/F → 3 key fix
+    if (chars[i] === 'A') chars[i] = '4';              // A → 4
     if (chars[i] === 'S') chars[i] = '5';
+    if (chars[i] === 'G') chars[i] = '6';              // G → 6
     if (chars[i] === 'B') chars[i] = '8';
   }
 
@@ -166,15 +174,18 @@ function normalizeAndCorrectGSTIN(raw) {
 
 function extractGSTIN(text) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const labelRegex = /(?:GSTIN|GST\s*NO\.?|GST\s*NUMBER|GST|TIN|UIN)[\s\:\=\#\.\-]*([0-9A-Za-z]{14,16})\b/gi;
-  const standaloneRegex = /\b([0-9OISB]{2}[A-Za-z0158]{5}[0-9OISB]{4}[A-Za-z0158]{1}[0-9A-Za-z]{1}[Zz2][0-9A-Za-z]{1})\b/g;
+  // Broader label regex: catches "BST ND:", "GST NO:", "GST IN:", "GSTIN:" etc.
+  const labelRegex = /(?:[GB]S[TI](?:\s*N[O0D]?)?|GSTIN|TIN|UIN)[:\s\=\#\.\-]*([0-9A-Za-z]{12,18})/gi;
+  const standaloneRegex = /\b([0-9TOISBZE]{2}[A-Za-z0158]{5}[0-9OISB]{4}[A-Za-z0158]{1}[0-9A-Za-z]{1}[Zz2][0-9A-Za-z]{1})\b/g;
 
   let bestGSTIN = '';
   let bestValid = false;
 
   for (const line of lines) {
+    // Pre-clean: replace slashes → 7 so "33CMOPS3/67A1ZV" becomes "33CMOPS3767A1ZV"
+    const cleanLine = line.replace(/\//g, '7').replace(/\\/g, '7');
     let m;
-    while ((m = labelRegex.exec(line)) !== null) {
+    while ((m = labelRegex.exec(cleanLine)) !== null) {
       const p = normalizeAndCorrectGSTIN(m[1]);
       if (p.gstin && (!bestGSTIN || p.isValid)) {
         bestGSTIN = p.gstin;
@@ -182,12 +193,25 @@ function extractGSTIN(text) {
         if (bestValid) return { gstin: bestGSTIN, isValid: true };
       }
     }
-    while ((m = standaloneRegex.exec(line)) !== null) {
+    while ((m = standaloneRegex.exec(cleanLine)) !== null) {
       const p = normalizeAndCorrectGSTIN(m[1]);
       if (p.gstin && (!bestGSTIN || p.isValid)) {
         bestGSTIN = p.gstin;
         bestValid = p.isValid;
         if (bestValid) return { gstin: bestGSTIN, isValid: true };
+      }
+    }
+    // Sliding-window word scan
+    const words = cleanLine.replace(/[^A-Z0-9\s]/gi, ' ').split(/\s+/);
+    for (const word of words) {
+      const w = word.trim();
+      if (w.length >= 13 && w.length <= 17) {
+        const p = normalizeAndCorrectGSTIN(w);
+        if (p.gstin && (!bestGSTIN || p.isValid)) {
+          bestGSTIN = p.gstin;
+          bestValid = p.isValid;
+          if (bestValid) return { gstin: bestGSTIN, isValid: true };
+        }
       }
     }
   }
