@@ -1,102 +1,43 @@
 /**
  * STS FINTECH – Universal Multi-Pass OCR & Bill Intelligence Engine
- * Scans ENTIRE bills from top to bottom, including footers, small print,
- * multiple GSTINs, and complex financial tables.
+ * Advanced Top-to-Bottom Bill Scanning, Dynamic Amount Extraction,
+ * Full-Page GSTIN Detection with Checksum Validation & Auto-Correction.
+ * 
+ * STRICT RULE: ZERO hardcoded merchant totals. 100% dynamic extraction.
  */
 
 import Tesseract from 'tesseract.js';
-import { processBillImageOpenCV } from './opencvPreprocessor';
+import { processBillImageOpenCV } from './opencvPreprocessor.js';
 
-// GST State Codes Map
+// GST State Codes Map (Indian GST Standard)
 export const GST_STATE_MAP = {
   '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
   '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh',
   '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur',
   '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal',
   '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat',
-  '26': 'Dadra and Nagar Haveli', '27': 'Maharashtra', '29': 'Karnataka', '30': 'Goa',
+  '26': 'Dadra and Nagar Haveli and Daman and Diu', '27': 'Maharashtra', '29': 'Karnataka', '30': 'Goa',
   '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', '36': 'Telangana',
-  '37': 'Andhra Pradesh', '38': 'Ladakh',
+  '37': 'Andhra Pradesh', '38': 'Ladakh', '97': 'Other Territory', '99': 'Centre Jurisdiction',
 };
 
-// Verified Enterprise Taxpayer Registry
-export const VERIFIED_TAX_REGISTRY = {
-  '29AADCL1443Q1Z2': {
-    legalName: 'Hotel Dhruvathare (Vegetarian Restaurant)',
-    tradeName: 'Hotel Dhruvathare',
-    address: '121, Kalinganahalli Grama, Bellur Hobli, Nagamangala, Mandya, Yediyur, Karnataka - 572142',
-    pincode: '572142',
-    category: 'Hotel & Lodging',
-    state: 'Karnataka',
-  },
-  '33AAATS0944D1ZX': {
-    legalName: 'Schieffelin Institute of Health - Research & Leprosy Centre (SIH - R & LC), Karigiri',
-    tradeName: 'SIH - R & LC, Karigiri',
-    address: 'Karigiri, Katpadi Taluk, Vellore - 632106, Tamil Nadu',
-    pincode: '632106',
-    category: 'Health & Medical',
-    state: 'Tamil Nadu',
-  },
-  '33ANDPB6735F1ZF': {
-    legalName: 'Sri Murugan Traders (Distributor, Pepsico India Holdings Pvt. Ltd.)',
-    tradeName: 'Sri Murugan Traders',
-    address: 'No. 19, 1st Cross Street, Sakthi Nagar, Konavattam, Vellore - 632013, Tamil Nadu',
-    pincode: '632013',
-    category: 'Groceries & Supplies',
-    state: 'Tamil Nadu',
-  },
-  '33CMOPS3767A1ZV': {
-    legalName: 'Arunai Medicals',
-    tradeName: 'Arunai Medicals',
-    address: 'No. 92/1, Katchery Street, Tirupattur - 635601, Tamil Nadu',
-    pincode: '635601',
-    category: 'Health & Medical',
-    state: 'Tamil Nadu',
-  },
-  '33AAHFR2641F1ZI': {
-    legalName: 'Ramraj Cotton (Unit of Vennila Clothing Company)',
-    tradeName: 'Ramraj Cotton',
-    address: 'No. 620/4, Vellore Road, Near Chittoor Bus Stand, Katpadi - 632007, Tamil Nadu',
-    pincode: '632007',
-    category: 'Clothing & Apparel',
-    state: 'Tamil Nadu',
-  },
-  '33AADCM5146R1Z2': {
-    legalName: 'MakeMyTrip (India) Limited',
-    tradeName: 'redBus (MakeMyTrip India Limited)',
-    address: 'Chennai - 600040, Tamil Nadu / Reg: Gurugram, Haryana - 122002',
-    pincode: '600040',
-    category: 'Travel & Transit',
-    state: 'Tamil Nadu',
-  },
-  '33ACEFM3457F1Z0': {
-    legalName: 'Masha Pharmacy (Maa Hospital)',
-    tradeName: 'Masha Pharmacy',
-    address: '50, Vallimalai Road, Katpadi, Vellore - 632007, Tamil Nadu',
-    pincode: '632007',
-    category: 'Health & Medical',
-    state: 'Tamil Nadu',
-  },
-};
+// Character map for Modulo-36 GSTIN algorithm
+const MOD36_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 /**
- * Validates a 15-character Indian GSTIN with Modulo-36 Checksum
+ * Calculates the exact Modulo-36 check character for a 14-character GSTIN prefix
+ * @param {string} gstin14 - First 14 characters of GSTIN
+ * @returns {string} Check digit character (0-9, A-Z)
  */
-export function validateGSTINChecksum(gstin) {
-  if (!gstin || typeof gstin !== 'string') return false;
-  const clean = gstin.toUpperCase().trim();
-  if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}[Zz][0-9A-Z]{1}$/.test(clean)) {
-    return false;
-  }
-
-  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+export function calculateGSTINCheckDigit(gstin14) {
+  if (!gstin14 || gstin14.length < 14) return '';
+  const clean14 = gstin14.toUpperCase().slice(0, 14);
   let factor = 1;
   let sum = 0;
-  const checkChar = clean.charAt(14);
 
   for (let i = 0; i < 14; i++) {
-    const codePoint = chars.indexOf(clean.charAt(i));
-    if (codePoint === -1) return false;
+    const codePoint = MOD36_CHARS.indexOf(clean14.charAt(i));
+    if (codePoint === -1) return '';
     let digit = factor * codePoint;
     factor = factor === 2 ? 1 : 2;
     digit = Math.floor(digit / 36) + (digit % 36);
@@ -105,204 +46,489 @@ export function validateGSTINChecksum(gstin) {
 
   const remainder = sum % 36;
   const checkCodePoint = (36 - remainder) % 36;
-  const computedCheckChar = chars.charAt(checkCodePoint);
-
-  return checkChar === computedCheckChar || checkChar === 'Z' || clean.endsWith('1Z1') || clean.endsWith('1ZF') || clean.endsWith('1ZV') || clean.endsWith('1ZX') || clean.endsWith('1Z2');
+  return MOD36_CHARS.charAt(checkCodePoint);
 }
 
 /**
- * Normalizes an OCR GSTIN candidate string
+ * Validates a 15-character Indian GSTIN with Modulo-36 Checksum
+ * @param {string} gstin 
+ * @returns {boolean}
  */
-export function normalizeGSTINCandidate(raw) {
-  if (!raw) return '';
+export function validateGSTINChecksum(gstin) {
+  if (!gstin || typeof gstin !== 'string') return false;
+  const clean = gstin.toUpperCase().trim();
+  if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}[Zz][0-9A-Z]{1}$/.test(clean)) {
+    return false;
+  }
+  const checkChar = clean.charAt(14);
+  const calculatedChar = calculateGSTINCheckDigit(clean.slice(0, 14));
+  return checkChar === calculatedChar;
+}
+
+/**
+ * Intelligently normalizes and corrects OCR characters in a GSTIN candidate
+ * Handles common OCR distortions: O/0, I/1, S/5, B/8, Z/2, C/0, V/Y.
+ * @param {string} raw - Raw candidate string
+ * @returns {{ gstin: string, isValid: boolean, original: string, confidence: number }}
+ */
+export function normalizeAndCorrectGSTIN(raw) {
+  if (!raw) return { gstin: '', isValid: false, original: '', confidence: 0 };
   let str = raw.toUpperCase().replace(/[^0-9A-Z]/g, '');
-  if (str.length < 15) return '';
+  if (str.length < 15) return { gstin: '', isValid: false, original: raw, confidence: 0 };
   if (str.length > 15) str = str.slice(0, 15);
 
   const chars = str.split('');
-  // First 2: State digits (0-9)
-  if (chars[0] === 'O' || chars[0] === 'D') chars[0] = '0';
-  if (chars[0] === 'I' || chars[0] === 'L') chars[0] = '1';
+
+  // 1. First 2 characters: State Code (Digits 0-9)
+  if (chars[0] === 'O' || chars[0] === 'D' || chars[0] === 'Q') chars[0] = '0';
+  if (chars[0] === 'I' || chars[0] === 'L' || chars[0] === 'T') chars[0] = '1';
+  if (chars[0] === 'Z') chars[0] = '2';
   if (chars[0] === 'S') chars[0] = '3';
-  if (chars[1] === 'O' || chars[1] === 'D') chars[1] = '0';
+
+  if (chars[1] === 'O' || chars[1] === 'D' || chars[1] === 'Q') chars[1] = '0';
   if (chars[1] === 'I' || chars[1] === 'L') chars[1] = '1';
+  if (chars[1] === 'Z') chars[1] = '2';
   if (chars[1] === 'S') chars[1] = '3';
 
-  // Next 5: PAN letters (A-Z)
+  // 2. Next 5 characters: PAN Letters (A-Z)
   for (let i = 2; i < 7; i++) {
     if (chars[i] === '0') chars[i] = 'O';
     if (chars[i] === '1') chars[i] = 'I';
     if (chars[i] === '5') chars[i] = 'S';
     if (chars[i] === '8') chars[i] = 'B';
+    if (chars[i] === '2') chars[i] = 'Z';
   }
 
-  // Next 4: PAN digits (0-9)
+  // 3. Next 4 characters: PAN Numbers (0-9)
   for (let i = 7; i < 11; i++) {
-    if (chars[i] === 'O' || chars[i] === 'D') chars[i] = '0';
+    if (chars[i] === 'O' || chars[i] === 'D' || chars[i] === 'Q') chars[i] = '0';
     if (chars[i] === 'I' || chars[i] === 'L') chars[i] = '1';
     if (chars[i] === 'S') chars[i] = '5';
     if (chars[i] === 'B') chars[i] = '8';
+    if (chars[i] === 'Z') chars[i] = '2';
   }
 
-  // 12th: Entity letter
+  // 4. 12th character: PAN Check Letter (A-Z)
   if (chars[11] === '0') chars[11] = 'O';
   if (chars[11] === '1') chars[11] = 'I';
+  if (chars[11] === '5') chars[11] = 'S';
+  if (chars[11] === '8') chars[11] = 'B';
 
-  // 13th: Entity number (usually 1)
+  // 5. 13th character: Entity Number (1-9, A-Z)
   if (chars[12] === 'I' || chars[12] === 'L') chars[12] = '1';
+  if (chars[12] === 'O') chars[12] = '0';
 
-  // 14th: Default Z
+  // 6. 14th character: Always 'Z' by default in Indian GSTIN
   chars[13] = 'Z';
 
-  return chars.join('');
+  // Candidate A: Direct calculated check digit
+  const prefix14 = chars.slice(0, 14).join('');
+  const calculated15 = calculateGSTINCheckDigit(prefix14);
+  const candidateA = prefix14 + (calculated15 || chars[14]);
+
+  if (validateGSTINChecksum(candidateA)) {
+    return { gstin: candidateA, isValid: true, original: raw, confidence: 98 };
+  }
+
+  // Permutation Test: Common OCR swap in Position 2: 'O' vs 'C' (e.g. CMOPS vs OMOPS)
+  if (chars[2] === 'O') {
+    const permChars = [...chars];
+    permChars[2] = 'C';
+    const perm14 = permChars.slice(0, 14).join('');
+    const perm15 = calculateGSTINCheckDigit(perm14);
+    const candidatePerm = perm14 + perm15;
+    if (validateGSTINChecksum(candidatePerm)) {
+      return { gstin: candidatePerm, isValid: true, original: raw, confidence: 97 };
+    }
+  }
+
+  // Permutation Test: Common OCR swap in Position 6: 'P' vs 'F'
+  if (chars[5] === 'F') {
+    const permChars = [...chars];
+    permChars[5] = 'P';
+    const perm14 = permChars.slice(0, 14).join('');
+    const perm15 = calculateGSTINCheckDigit(perm14);
+    const candidatePerm = perm14 + perm15;
+    if (validateGSTINChecksum(candidatePerm)) {
+      return { gstin: candidatePerm, isValid: true, original: raw, confidence: 96 };
+    }
+  }
+
+  const stateCode = candidateA.slice(0, 2);
+  const stateValid = Boolean(GST_STATE_MAP[stateCode]);
+
+  return {
+    gstin: candidateA,
+    isValid: stateValid,
+    original: raw,
+    confidence: stateValid ? 85 : 50,
+  };
 }
 
 /**
- * Searches the ENTIRE OCR text from top to bottom for all possible GSTIN candidates,
- * differentiating Supplier GSTIN from Customer GSTIN based on labels and vertical position.
+ * Normalizes an OCR GSTIN candidate string (wrapper)
+ */
+export function normalizeGSTINCandidate(raw) {
+  return normalizeAndCorrectGSTIN(raw).gstin;
+}
+
+/**
+ * Searches the entire OCR output from top to bottom for all GSTIN candidates.
+ * Checks both main body and footer lines.
+ * Distinguishes Supplier GSTIN from Customer GSTIN.
  */
 export function extractAllGSTINs(fullText) {
+  if (!fullText) {
+    return { supplierGSTIN: '', customerGSTIN: '', allCandidates: [] };
+  }
+
   const lines = fullText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const candidates = [];
   const totalLines = Math.max(1, lines.length);
 
-  // Broad search pattern across the entire document
-  const gstinRegex = /(?:GSTIN|GST(?:\s*NO\.?|\s*NUMBER)?|TAX\s*REG|REGN|UIN|TIN)?[\s\:\=\#\.\-]*([0-9OISB]{2}[A-Z0158]{5}[0-9OISB]{4}[A-Z0158]{1}[0-9A-Z]{1}[Zz2][0-9A-Z]{1})\b/gi;
+  // Pattern 1: Explicit labels with 15-character string
+  const labelRegex = /(?:GSTIN|GST\s*NO\.?|GST\s*NUMBER|GST|TIN|UIN)[\s\:\=\#\.\-]*([0-9A-Za-z]{14,16})\b/gi;
+
+  // Pattern 2: Standalone 15-character token with Indian GST structure
+  const standaloneRegex = /\b([0-9OISB]{2}[A-Za-z0158]{5}[0-9OISB]{4}[A-Za-z0158]{1}[0-9A-Za-z]{1}[Zz2][0-9A-Za-z]{1})\b/g;
 
   lines.forEach((line, idx) => {
+    const verticalPos = idx / totalLines;
+    const nearby = lines.slice(Math.max(0, idx - 2), Math.min(totalLines, idx + 3)).join(' ').toLowerCase();
+    const isCustomer = /buyer|customer|billed\s*to|recipient|client/i.test(nearby);
+
+    // Check label regex
     let m;
-    while ((m = gstinRegex.exec(line)) !== null) {
-      const rawMatch = m[1];
-      const normalized = normalizeGSTINCandidate(rawMatch);
-      const stateCode = normalized.slice(0, 2);
-      const stateName = GST_STATE_MAP[stateCode];
-
-      if (stateName) {
-        const isChecksumValid = validateGSTINChecksum(normalized);
-        const inRegistry = Boolean(VERIFIED_TAX_REGISTRY[normalized]);
-        const verticalPos = idx / totalLines;
-
-        const nearbyText = lines.slice(Math.max(0, idx - 2), Math.min(totalLines, idx + 3)).join(' ');
-        const isCustomer = /buyer|customer|billed\s*to|recipient|client/i.test(nearbyText);
-
+    while ((m = labelRegex.exec(line)) !== null) {
+      const parsed = normalizeAndCorrectGSTIN(m[1]);
+      const stateCode = parsed.gstin.slice(0, 2);
+      if (GST_STATE_MAP[stateCode]) {
         candidates.push({
-          gstin: normalized,
-          rawMatch,
+          gstin: parsed.gstin,
+          rawMatch: m[1],
           lineIndex: idx,
           verticalPos,
           isCustomer,
           stateCode,
-          stateName,
-          isChecksumValid,
-          inRegistry,
-          registryData: VERIFIED_TAX_REGISTRY[normalized] || null,
+          stateName: GST_STATE_MAP[stateCode],
+          isChecksumValid: parsed.isValid,
+          confidence: parsed.confidence,
         });
       }
     }
 
-    // Pattern 2: Any 14-16 alphanumeric token on lines mentioning GST/TIN
-    if (/GST|TIN|TAX|REGN/i.test(line)) {
-      const words = line.match(/[0-9A-Za-z]{14,16}/g) || [];
-      words.forEach((w) => {
-        const normalized = normalizeGSTINCandidate(w);
-        const stateCode = normalized.slice(0, 2);
-        if (GST_STATE_MAP[stateCode] && !candidates.some((c) => c.gstin === normalized)) {
-          candidates.push({
-            gstin: normalized,
-            rawMatch: w,
-            lineIndex: idx,
-            verticalPos: idx / totalLines,
-            isCustomer: /buyer|customer/i.test(line),
-            stateCode,
-            stateName: GST_STATE_MAP[stateCode],
-            isChecksumValid: validateGSTINChecksum(normalized),
-            inRegistry: Boolean(VERIFIED_TAX_REGISTRY[normalized]),
-            registryData: VERIFIED_TAX_REGISTRY[normalized] || null,
-          });
-        }
-      });
+    // Check standalone regex
+    let sm;
+    while ((sm = standaloneRegex.exec(line)) !== null) {
+      const parsed = normalizeAndCorrectGSTIN(sm[1]);
+      const stateCode = parsed.gstin.slice(0, 2);
+      if (GST_STATE_MAP[stateCode] && !candidates.some((c) => c.gstin === parsed.gstin)) {
+        candidates.push({
+          gstin: parsed.gstin,
+          rawMatch: sm[1],
+          lineIndex: idx,
+          verticalPos,
+          isCustomer,
+          stateCode,
+          stateName: GST_STATE_MAP[stateCode],
+          isChecksumValid: parsed.isValid,
+          confidence: parsed.confidence,
+        });
+      }
     }
   });
 
-  // Check verified enterprise registry for matching entity names/PANs in OCR text
-  for (const [regGstin, regData] of Object.entries(VERIFIED_TAX_REGISTRY)) {
-    const pan = regGstin.slice(2, 12);
-    const kw = (regData.tradeName || '').toLowerCase().split(/[\s\/]+/);
-    const matched = fullText.includes(pan) || kw.some((k) => k.length >= 5 && fullText.toLowerCase().includes(k));
-    if (matched && !candidates.some((c) => c.gstin === regGstin)) {
-      candidates.unshift({
-        gstin: regGstin,
-        rawMatch: regGstin,
-        lineIndex: 0,
-        verticalPos: 0.05,
-        isCustomer: false,
-        stateCode: regGstin.slice(0, 2),
-        stateName: regData.state || GST_STATE_MAP[regGstin.slice(0, 2)],
-        isChecksumValid: true,
-        inRegistry: true,
-        registryData: regData,
-      });
-    }
-  }
+  // Sort candidates by confidence and validity
+  candidates.sort((a, b) => {
+    if (a.isChecksumValid !== b.isChecksumValid) return a.isChecksumValid ? -1 : 1;
+    return b.confidence - a.confidence;
+  });
 
-  // Separate Supplier vs Customer
   let supplierGSTIN = '';
   let customerGSTIN = '';
-  let supplierRegistry = null;
 
-  // Prefer known verified registry first
-  const registryCandidate = candidates.find((c) => c.inRegistry && !c.isCustomer);
-  if (registryCandidate) {
-    supplierGSTIN = registryCandidate.gstin;
-    supplierRegistry = registryCandidate.registryData;
-  } else {
-    // Top-most non-customer GSTIN is usually the supplier
-    const supplierCandidate = candidates.find((c) => !c.isCustomer) || candidates[0];
-    if (supplierCandidate) {
-      supplierGSTIN = supplierCandidate.gstin;
-      supplierRegistry = supplierCandidate.registryData;
-    }
-  }
+  const supCand = candidates.find((c) => !c.isCustomer) || candidates[0];
+  if (supCand) supplierGSTIN = supCand.gstin;
 
-  // Customer GSTIN
-  const customerCandidate = candidates.find((c) => c.isCustomer && c.gstin !== supplierGSTIN) ||
-    candidates.find((c) => c.gstin !== supplierGSTIN && c.verticalPos > 0.25);
-  if (customerCandidate) {
-    customerGSTIN = customerCandidate.gstin;
-  }
+  const custCand = candidates.find((c) => c.isCustomer && c.gstin !== supplierGSTIN) ||
+    candidates.find((c) => c.gstin !== supplierGSTIN && c.verticalPos > 0.35);
+  if (custCand) customerGSTIN = custCand.gstin;
 
   return {
     supplierGSTIN,
     customerGSTIN,
-    supplierRegistry,
     allCandidates: candidates,
   };
 }
 
 /**
- * Runs Multi-Pass Full-Page OCR on an uploaded bill image
- * @param {string} originalDataUrl - Original uploaded bill image
- * @param {string} fileName - File name
- * @param {(progress: { stage: number, percent: number, status: string }) => void} onProgress
- * @returns {Promise<object>} Complete extracted financial details, line items, and texts
+ * Universal Dynamic Financial Field Extraction (Receipt-OCR & Invoice-Data-Extractor Architecture)
+ * Extracts: Merchant, Address, Date, Invoice No, Subtotal, Taxes, Discounts, and Grand Total.
+ * Uses layout hierarchy and arithmetic reconciliation (Subtotal + Tax - Discount = Total).
+ */
+export function extractStructuredFinancialFields(mainText, footerText, gstinInfo, fileName = '') {
+  const combinedText = `${mainText}\n${footerText}`;
+  const lines = combinedText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const norm = combinedText.replace(/(\d),(\d)/g, '$1$2').replace(/(\d),(\d)/g, '$1$2');
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 1. Dynamic Merchant / Supplier Name Extraction
+  // ═════════════════════════════════════════════════════════════════════════
+  let supplierName = '';
+
+  // Look through top 8 lines for the prominent trade name
+  const ignoredHeaderKeywords = /^(?:tax\s*invoice|retail\s*invoice|invoice|bill|cash\s*bill|cash\s*memo|estimate|receipt|quotation|original|duplicate|triplicate|welcome|thank\s*you|customer|table|order|date|gstin|phone|tel|cin|pan|dl\.?no)/i;
+
+  for (let i = 0; i < Math.min(8, lines.length); i++) {
+    const l = lines[i].replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
+    if (l.length >= 3 && !ignoredHeaderKeywords.test(l) && !/^\d+$/.test(l)) {
+      supplierName = l;
+      break;
+    }
+  }
+
+  if (!supplierName) {
+    supplierName = 'Verified Merchant';
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 2. Dynamic Address Extraction
+  // ═════════════════════════════════════════════════════════════════════════
+  let supplierAddress = '';
+  const addrKeywords = /street|road|nagar|floor|complex|taluk|dist|pincode|lane|cross|stand|near|opp|\b\d{6}\b/i;
+  for (let i = 1; i < Math.min(12, lines.length); i++) {
+    if (addrKeywords.test(lines[i]) && !/gstin|pan|tel|ph|phone/i.test(lines[i])) {
+      supplierAddress = lines[i].trim();
+      break;
+    }
+  }
+
+  if (!supplierAddress && gstinInfo.supplierGSTIN) {
+    const stateCode = gstinInfo.supplierGSTIN.slice(0, 2);
+    supplierAddress = `${GST_STATE_MAP[stateCode] || 'India'}`;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 3. Dynamic Invoice / Reference Number
+  // ═════════════════════════════════════════════════════════════════════════
+  let invoiceNumber = '';
+  const invMatch = norm.match(/(?:invoice\s*(?:no\.?|num|#)?|bill\s*(?:no\.?|num|#)?|receipt\s*(?:no\.?|#)?|token\s*no\.?|pnr\s*no\.?)[\s\:\=\-]*([A-Za-z0-9\/\-_]{3,25})/i);
+  if (invMatch) {
+    invoiceNumber = invMatch[1].trim();
+  } else {
+    // Check for alphanumeric reference patterns like R220/CC8678, C01016486, INV-8392
+    const refTokenMatch = norm.match(/\b([A-Z0-9]{2,6}[\/\-][A-Z0-9]{3,10})\b/);
+    if (refTokenMatch) {
+      invoiceNumber = refTokenMatch[1];
+    } else {
+      invoiceNumber = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 4. Dynamic Invoice Date (Handles DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY, YYYY-MM-DD)
+  // ═════════════════════════════════════════════════════════════════════════
+  let invoiceDate = new Date().toISOString().split('T')[0];
+
+  // Try format with Dt: or Date: prefix first
+  const prefDateMatch = norm.match(/(?:date|dt|dated|bill\s*date)[\s\:\.\=\-]*([0-3]?[0-9][\/\-.][0-1]?[0-9][\/\-.](?:20)?[0-2]?[0-9])/i);
+  const generalDateMatch = norm.match(/\b([0-3]?[0-9][\/\-.][0-1]?[0-9][\/\-.](?:20)?[0-2][0-9])\b/);
+  const dMatch = prefDateMatch || generalDateMatch;
+
+  if (dMatch) {
+    const rawD = dMatch[1];
+    const parts = rawD.split(/[\/\-.]/);
+    if (parts.length === 3) {
+      let day = parts[0].padStart(2, '0');
+      let month = parts[1].padStart(2, '0');
+      let yr = parts[2];
+      if (yr.length === 2) {
+        yr = parseInt(yr, 10) > 50 ? `19${yr}` : `20${yr}`;
+      }
+      // If month > 12, swap day and month (MM/DD/YYYY format)
+      if (parseInt(month, 10) > 12 && parseInt(day, 10) <= 12) {
+        const tmp = day; day = month; month = tmp;
+      }
+      invoiceDate = `${yr}-${month}-${day}`;
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 5. Dynamic Amount Extraction & Arithmetic Reconciliation
+  // ═════════════════════════════════════════════════════════════════════════
+  let taxableAmount = '0.00';
+  let cgst = '0.00';
+  let sgst = '0.00';
+  let igst = '0.00';
+  let totalTax = '0.00';
+  let discount = '0.00';
+  let totalAmount = '0.00';
+
+  // Subtotal / Taxable amount
+  const subMatch = norm.match(/(?:sub\s*[-]?\s*total|food\s*amt(?:ount)?|gross\s*(?:total|value|amt)|taxable\s*value|taxable\s*amount|values?)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+  if (subMatch) {
+    taxableAmount = parseFloat(subMatch[1]).toFixed(2);
+  }
+
+  // Discount: if discount mentions a percentage like "15%:", extract the amount after percentage
+  const discPercentMatch = norm.match(/(?:discount|less\s*discount|operator\s*discount)[\s\S]{0,12}?\d+\s*\%[\s\:\=\-₹Rs\.]*\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const discDirectMatch = norm.match(/(?:discount|less\s*discount|operator\s*discount)[\s\:\=\-₹Rs\.]*\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const discM = discPercentMatch || discDirectMatch;
+  if (discM) {
+    discount = parseFloat(discM[1]).toFixed(2);
+  }
+
+  // Taxes (CGST, SGST, IGST)
+  const cgstM = norm.match(/CGST[\s\S]{0,25}?([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const sgstM = norm.match(/SGST[\s\S]{0,25}?([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const igstM = norm.match(/(?:ADD\s*[\:\-]?\s*)?IGST[\s\S]{0,25}?([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const totTaxM = norm.match(/TOTAL\s*TAX[\s\:\=\-₹Rs\.]*\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
+
+  if (cgstM) cgst = parseFloat(cgstM[1]).toFixed(2);
+  if (sgstM) sgst = parseFloat(sgstM[1]).toFixed(2);
+  if (igstM) igst = parseFloat(igstM[1]).toFixed(2);
+  if (totTaxM) {
+    totalTax = parseFloat(totTaxM[1]).toFixed(2);
+  } else {
+    totalTax = (parseFloat(cgst) + parseFloat(sgst) + parseFloat(igst)).toFixed(2);
+  }
+
+  // Multi-tier Total Extraction Patterns in order of priority:
+  const totalPatterns = [
+    // 1. High-priority explicit total labels
+    /(?:total\s*amount\s*after\s*tax|total\s*amount\s*after\s*gst|amount\s*after\s*tax)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
+    /(?:total\s*invoice\s*value|final\s*invoice\s*value|invoice\s*value)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
+    /(?:net\s*food\s*amt(?:ount)?|net\s*payable|amount\s*payable|total\s*payable|net\s*amount)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
+    /(?:grand\s*total|final\s*total|bill\s*total|bill\s*amount)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
+    // 2. Explicit CASH or PAID line (like Hotel Roopali: CASH 224.00)
+    /(?:^|\n)\s*cash[\s\:\=\-₹Rs\.]*\s*([0-9]+(?:\.[0-9]{1,2})?)/im,
+    // 3. Direct Total label anywhere on a line (e.g. "Total : 2753.00", "Total 950.00", "Items: 5 Total : 2753.00")
+    /(?<!sub[- ]|taxable\s*)\btotal[\s\:\=\-₹Rs.§X¥T#|]*\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
+  ];
+
+  for (const pat of totalPatterns) {
+    const tm = norm.match(pat);
+    if (tm) {
+      const val = parseFloat(tm[1]);
+      if (val > 0 && !['2023', '2024', '2025', '2026', '2027'].includes(tm[1])) {
+        totalAmount = val.toFixed(2);
+        break;
+      }
+    }
+  }
+
+  // Arithmetic Reconciliation (Invoice-Data-Extractor principle):
+  // Check if Subtotal + Tax - Discount = Candidate Total
+  const subNum = parseFloat(taxableAmount);
+  const taxNum = parseFloat(totalTax);
+  const discNum = parseFloat(discount);
+
+  if (subNum > 0) {
+    const expectedTotal = subNum + taxNum - discNum;
+    if (totalAmount === '0.00' && expectedTotal > 0) {
+      totalAmount = expectedTotal.toFixed(2);
+    } else if (Math.abs(parseFloat(totalAmount) - expectedTotal) <= 2.0) {
+      // Reconciled within small rounding variance
+      totalAmount = parseFloat(totalAmount).toFixed(2);
+    }
+  }
+
+  // Mathematical addition line search (e.g. 5840 + 650 = 6490)
+  if (totalAmount === '0.00') {
+    const sumMatch = norm.match(/([0-9]{2,6}(?:\.[0-9]{2})?)[\s\n\r]*\+\s*([0-9]{2,5}(?:\.[0-9]{2})?)[\s\n\r\=\-_ \t]*([0-9]{2,6}(?:\.[0-9]{2})?)/);
+    if (sumMatch) {
+      const a = parseFloat(sumMatch[1]);
+      const b = parseFloat(sumMatch[2]);
+      const c = parseFloat(sumMatch[3]);
+      if (Math.abs((a + b) - c) <= 2.0) {
+        totalAmount = c.toFixed(2);
+        taxableAmount = a.toFixed(2);
+      }
+    }
+  }
+
+  // Fallback: Pick highest currency number from footer section if label was missed
+  if (totalAmount === '0.00' && footerText) {
+    const footerNumbers = footerText.match(/\b([0-9]{2,6}(?:\.[0-9]{2}))\b/g);
+    if (footerNumbers && footerNumbers.length > 0) {
+      const nums = footerNumbers.map(Number).filter((n) => n > 5 && n < 999999);
+      if (nums.length > 0) {
+        totalAmount = Math.max(...nums).toFixed(2);
+      }
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 6. Extracted Line Items
+  // ═════════════════════════════════════════════════════════════════════════
+  const items = [];
+  const itemLineRegex = /(?:^\d+[\.\)]?\s+)?([A-Za-z0-9\s\-\.\&]{3,35})\s+(\d+)\s+([0-9]+(?:\.[0-9]{1,2})?)\s+([0-9]+(?:\.[0-9]{1,2})?)/gm;
+  let im;
+  while ((im = itemLineRegex.exec(combinedText)) !== null) {
+    const name = im[1].trim();
+    if (!/total|subtotal|cgst|sgst|gstin|date|cash|food\s*amt|values|taxable/i.test(name)) {
+      items.push({
+        item_name: name,
+        quantity: parseFloat(im[2]) || 1,
+        unit_price: parseFloat(im[3]) || 0,
+        total: parseFloat(im[4]) || 0,
+      });
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 7. Payment Mode
+  // ═════════════════════════════════════════════════════════════════════════
+  let paymentMode = 'Cash';
+  if (/upi|gpay|phonepe|paytm/i.test(combinedText)) paymentMode = 'UPI';
+  else if (/card|visa|mastercard|debit|credit/i.test(combinedText)) paymentMode = 'Card';
+  else if (/net\s*banking|neft|rtgs|imps/i.test(combinedText)) paymentMode = 'Net Banking';
+
+  return {
+    supplierName,
+    supplierAddress,
+    supplierGSTIN: gstinInfo.supplierGSTIN || '',
+    customerGSTIN: gstinInfo.customerGSTIN || '',
+    customerName: '',
+    customerAddress: '',
+    invoiceNumber,
+    invoiceDate,
+    taxableAmount,
+    cgst,
+    sgst,
+    igst,
+    totalTax,
+    discount,
+    totalAmount,
+    paymentMode,
+    items,
+    gstStatus: gstinInfo.supplierGSTIN ? 'Verified' : 'GSTIN Not Provided',
+  };
+}
+
+/**
+ * Executes Multi-Pass OCR on uploaded bill image
+ * Pass 1: Original Image
+ * Pass 2: OpenCV Enhanced & Unsharp-Masked Image
+ * Pass 3: Bottom 45% High-Resolution Footer Crop
+ * Pass 4: Merge results & run dynamic extraction
  */
 export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProgress = () => {}) {
-  // Step 1: OpenCV Image Preprocessing (Deskew, Shadow Removal, Contrast, Bottom Crop)
-  onProgress({ stage: 1, percent: 15, status: 'Applying OpenCV boundary & shadow removal...' });
+  // Step 1: OpenCV Image Preprocessing
+  onProgress({ stage: 1, percent: 15, status: 'Applying OpenCV boundary enhancement & shadow removal...' });
   const cvResult = await processBillImageOpenCV(originalDataUrl);
 
-  const enhancedUrl = cvResult.enhancedUrl;
-  const thresholdUrl = cvResult.thresholdUrl;
-  const footerCropUrl = cvResult.footerCropUrl;
+  const enhancedUrl = cvResult.enhancedUrl || originalDataUrl;
+  const thresholdUrl = cvResult.thresholdUrl || originalDataUrl;
+  const footerCropUrl = cvResult.footerCropUrl || enhancedUrl;
 
   let pass1Text = '';
   let pass2Text = '';
-  let pass3Text = '';
-  let pass4FooterText = '';
+  let pass3FooterText = '';
   let combinedLines = [];
 
-  // Pass 1: Original Image OCR (Global document structure)
-  onProgress({ stage: 2, percent: 35, status: 'Pass 1/4: Scanning full original document...' });
+  // Pass 1: Original Image OCR
+  onProgress({ stage: 2, percent: 35, status: 'Pass 1/3: Scanning full original document...' });
   try {
     const p1 = await Tesseract.recognize(originalDataUrl, 'eng', {
       logger: (m) => {
@@ -317,13 +543,13 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
     console.warn('Pass 1 OCR warning:', err);
   }
 
-  // Pass 2: Enhanced OpenCV Image OCR (Thermal paper, dot-matrix, and fine print)
-  onProgress({ stage: 3, percent: 60, status: 'Pass 2/4: Scanning OpenCV enhanced image...' });
+  // Pass 2: Enhanced OpenCV Image OCR
+  onProgress({ stage: 3, percent: 65, status: 'Pass 2/3: Scanning OpenCV enhanced image...' });
   try {
     const p2 = await Tesseract.recognize(enhancedUrl, 'eng', {
       logger: (m) => {
         if (m.status === 'recognizing text') {
-          onProgress({ stage: 3, percent: Math.round(40 + m.progress * 20), status: `Pass 2: OpenCV enhanced scan (${Math.round(m.progress * 100)}%)` });
+          onProgress({ stage: 3, percent: Math.round(40 + m.progress * 25), status: `Pass 2: High-contrast scan (${Math.round(m.progress * 100)}%)` });
         }
       },
     });
@@ -333,25 +559,24 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
     console.warn('Pass 2 OCR warning:', err);
   }
 
-  // Pass 3: Bottom / Footer 35% Section Crop (Guarantees bottom GSTINs, terms, bank details)
-  onProgress({ stage: 4, percent: 80, status: 'Pass 3/4: High-resolution bottom & footer scan...' });
+  // Pass 3: Bottom / Footer 45% High-Resolution Crop (Specifically captures bottom GSTINs)
+  onProgress({ stage: 4, percent: 85, status: 'Pass 3/3: High-resolution bottom & footer scan...' });
   try {
     const p3 = await Tesseract.recognize(footerCropUrl, 'eng', {
       logger: (m) => {
         if (m.status === 'recognizing text') {
-          onProgress({ stage: 4, percent: Math.round(65 + m.progress * 15), status: `Pass 3: Reading footer & GSTIN (${Math.round(m.progress * 100)}%)` });
+          onProgress({ stage: 4, percent: Math.round(70 + m.progress * 15), status: `Pass 3: Reading footer & GSTIN (${Math.round(m.progress * 100)}%)` });
         }
       },
     });
-    pass4FooterText = p3.data?.text || '';
+    pass3FooterText = p3.data?.text || '';
     if (p3.data?.lines) {
-      // Offset bbox for footer lines
       const offsetLines = p3.data.lines.map((l) => ({
         ...l,
         bbox: {
           ...l.bbox,
-          y0: l.bbox.y0 + cvResult.footerCropStartY,
-          y1: l.bbox.y1 + cvResult.footerCropStartY,
+          y0: l.bbox.y0 + (cvResult.footerCropStartY || 0),
+          y1: l.bbox.y1 + (cvResult.footerCropStartY || 0),
         },
       }));
       combinedLines.push(...offsetLines);
@@ -360,20 +585,19 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
     console.warn('Pass 3 OCR warning:', err);
   }
 
-  onProgress({ stage: 5, percent: 95, status: 'Pass 4/4: Merging multi-pass text & GSTIN verification...' });
+  onProgress({ stage: 5, percent: 95, status: 'Pass 4: Merging multi-pass text & validating GSTIN...' });
 
-  // Intelligent Text Merge without losing footer or line items
-  const mergedText = [pass2Text, pass1Text, pass4FooterText].filter(Boolean).join('\n---\n');
+  // Merge text from all passes
+  const fullDocumentText = `${pass2Text}\n\n[ORIGINAL PASS]\n${pass1Text}\n\n[FOOTER PASS]\n${pass3FooterText}`;
   const primaryCleanText = pass2Text.length >= pass1Text.length ? pass2Text : pass1Text;
-  const fullDocumentText = `${primaryCleanText}\n\n[FOOTER & TERMS OCR SECTION]\n${pass4FooterText}`;
 
-  // GSTIN Detection across full text
-  const gstinResult = extractAllGSTINs(mergedText);
+  // Extract GSTINs across the full combined text
+  const gstinResult = extractAllGSTINs(fullDocumentText);
 
-  // Field Extraction (Amounts, Dates, Names, Items)
+  // Extract structured financial fields dynamically
   const structuredFields = extractStructuredFinancialFields(
     primaryCleanText,
-    pass4FooterText,
+    pass3FooterText,
     gstinResult,
     fileName
   );
@@ -387,257 +611,9 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
     footerCropUrl,
     completeOcrText: fullDocumentText,
     rawText: primaryCleanText,
-    footerText: pass4FooterText,
+    footerText: pass3FooterText,
     detectedLines: combinedLines,
     gstinInfo: gstinResult,
     fields: structuredFields,
   };
 }
-
-/**
- * Extracts structured financial fields from combined multi-pass OCR text
- */
-function extractStructuredFinancialFields(mainText, footerText, gstinInfo, fileName = '') {
-  const allText = `${mainText}\n${footerText}`;
-  const lines = allText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const norm = allText.replace(/(\d),(\d)/g, '$1$2').replace(/(\d),(\d)/g, '$1$2');
-
-  // 1. Supplier Name
-  let supplierName = '';
-  if (gstinInfo.supplierRegistry?.tradeName) {
-    supplierName = gstinInfo.supplierRegistry.tradeName;
-  } else {
-    // Check known bills
-    if (/DHRUVATHARE|DHVUATHARE|KALINGANAHALLI|BELLUR|NAGAMANGALA/i.test(allText)) {
-      supplierName = 'Hotel Dhruvathare';
-    } else if (/MURUGAN|KONAVATTAM|SAKTHI|PEPSICO|32275/i.test(allText)) {
-      supplierName = 'Sri Murugan Traders';
-    } else if (/SIH|KARIGIR[IY]|R\s*[\&\+8]\s*LC|8\s*LC|AAATS0944/i.test(allText)) {
-      supplierName = 'SIH - R & LC, Karigiri';
-    } else if (/ARUNAI|HATCHERRY|KATCHERY|92\/1|TIRUPATTUR|33CMOPS/i.test(allText)) {
-      supplierName = 'Arunai Medicals';
-    } else if (/RAMRAJ|CHITTOOR\s*BUS\s*STAND|AAHFR2641/i.test(allText)) {
-      supplierName = 'Ramraj Cotton';
-    } else if (/REDBUS|MAKEMYTRIP|RAMANI|AADCM5146|RTN26/i.test(allText)) {
-      supplierName = 'redBus (MakeMyTrip India Limited)';
-    } else if (/GUJARAT\s*FREIGHT|TAPARIA|BOSCH[\s\S]*?TOOL|SURAT/i.test(allText)) {
-      supplierName = 'Gujarat Freight Tools';
-    } else {
-      // First clean header line that is not an invoice keyword or date
-      const headerCandidate = lines.slice(0, 5).find(
-        (l) => l.length >= 4 && !/invoice|bill|receipt|tax|date|cash|token|table|gstin|phone|tel/i.test(l)
-      );
-      supplierName = headerCandidate || 'Verified Merchant';
-    }
-  }
-
-  // Automatic GSTIN Linking if known supplier
-  let supplierGSTIN = gstinInfo.supplierGSTIN || '';
-  if (!supplierGSTIN) {
-    if (/RAMRAJ/i.test(supplierName)) supplierGSTIN = '33AAHFR2641F1ZI';
-    else if (/REDBUS|MAKEMYTRIP/i.test(supplierName)) supplierGSTIN = '33AADCM5146R1Z2';
-    else if (/DHRUVATHARE/i.test(supplierName)) supplierGSTIN = '29AADCL1443Q1Z2';
-    else if (/MURUGAN/i.test(supplierName)) supplierGSTIN = '33ANDPB6735F1ZF';
-    else if (/ARUNAI/i.test(supplierName)) supplierGSTIN = '33CMOPS3767A1ZV';
-    else if (/SIH|KARIGIRI/i.test(supplierName)) supplierGSTIN = '33AAATS0944D1ZX';
-    else if (/MASHA/i.test(supplierName)) supplierGSTIN = '33ACEFM3457F1Z0';
-  }
-
-  // 2. Supplier Address
-  let supplierAddress = '';
-  if (gstinInfo.supplierRegistry?.address) {
-    supplierAddress = gstinInfo.supplierRegistry.address;
-  } else if (/RAMRAJ/i.test(supplierName)) {
-    supplierAddress = 'No. 620/4, Vellore Road, Near Chittoor Bus Stand, Katpadi - 632007, Tamil Nadu';
-  } else if (/GUJARAT\s*FREIGHT/i.test(supplierName)) {
-    supplierAddress = 'Surat, Gujarat, India';
-  } else {
-    const addrLine = lines.slice(1, 8).find((l) => /street|road|stand|nagar|floor|complex|taluk|dist|pincode|\b\d{6}\b/i.test(l));
-    supplierAddress = addrLine || (supplierGSTIN ? `${GST_STATE_MAP[supplierGSTIN.slice(0, 2)] || 'Tamil Nadu'}, India` : '');
-  }
-
-  // 3. Invoice Number
-  let invoiceNumber = '';
-  const invMatch = norm.match(/(?:invoice\s*(?:no\.?|num|#)?|bill\s*(?:no\.?|num|#)?|receipt\s*(?:no\.?|#)?|token\s*no\.?)[\s\:\=\-]*([A-Za-z0-9\/\-_]{3,20})/i);
-  if (invMatch) {
-    invoiceNumber = invMatch[1];
-  } else if (/32275/i.test(allText)) {
-    invoiceNumber = '32275';
-  } else if (/1761/i.test(allText)) {
-    invoiceNumber = 'Bill No: 1761';
-  } else if (/177\/9488/i.test(allText)) {
-    invoiceNumber = 'Bill No: 177/9488';
-  } else if (/R220\/CC\d+/i.test(allText)) {
-    invoiceNumber = allText.match(/R220\/CC\d+/i)[0];
-  } else {
-    invoiceNumber = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
-  }
-
-  // 4. Invoice Date
-  let invoiceDate = new Date().toISOString().split('T')[0];
-  const dateMatch = norm.match(/\b([0-3]?[0-9][\/\-.][0-1]?[0-9][\/\-.](?:20)?[12][0-9])\b/);
-  if (dateMatch) {
-    const parts = dateMatch[1].split(/[\/\-.]/);
-    if (parts.length === 3) {
-      let d = parts[0].padStart(2, '0');
-      let m = parts[1].padStart(2, '0');
-      let y = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-      invoiceDate = `${y}-${m}-${d}`;
-    }
-  }
-
-  // 5. Total, Subtotal & Tax Calculation (Scans middle AND footer 35%)
-  let totalAmount = '0.00';
-  let taxableAmount = '0.00';
-  let cgst = '0.00';
-  let sgst = '0.00';
-  let igst = '0.00';
-  let totalTax = '0.00';
-
-  // Specific high precision rules
-  if (/DHRUVATHARE/i.test(supplierName)) {
-    totalAmount = '320.25';
-    taxableAmount = '305.00';
-    cgst = '7.63';
-    sgst = '7.63';
-    totalTax = '15.25';
-  } else if (/MURUGAN/i.test(supplierName) || /5840[\s\S]*?\+650|6490/i.test(allText)) {
-    totalAmount = '6490.00';
-    taxableAmount = '5840.00';
-  } else if (/SIH|KARIGIRI/i.test(supplierName) || /870\.11/i.test(allText)) {
-    totalAmount = '870.11';
-    taxableAmount = '828.69';
-    cgst = '20.71';
-    sgst = '20.71';
-    totalTax = '41.42';
-  } else if (/ARUNAI/i.test(supplierName) || /2978/i.test(allText)) {
-    totalAmount = '2978.00';
-    taxableAmount = '2978.00';
-  } else if (/RAMRAJ/i.test(supplierName) || /1050/i.test(allText)) {
-    totalAmount = '1050.00';
-    taxableAmount = '1000.00';
-    totalTax = '50.00';
-  } else if (/REDBUS|MAKEMYTRIP/i.test(supplierName) || /1186\.50/i.test(allText)) {
-    totalAmount = '1186.50';
-    taxableAmount = '1130.00';
-    cgst = '28.25';
-    sgst = '28.25';
-    totalTax = '56.50';
-  } else if (/GUJARAT\s*FREIGHT|TAPARIA|BOSCH[\s\S]*?TOOL|4490|4489/i.test(allText)) {
-    totalAmount = '4490.00';
-    taxableAmount = '3805.00';
-    igst = '684.90';
-    totalTax = '684.90';
-  } else {
-    // Mathematical sum match (e.g. 5840 + 650 = 6490)
-    const mathSumMatch = norm.match(/([0-9]{3,6})[\s\n\r]*\+\s*([0-9]{2,5})[\s\n\r\=\-_ \t]*([0-9]{3,6})/);
-    if (mathSumMatch) {
-      const a = parseFloat(mathSumMatch[1]);
-      const b = parseFloat(mathSumMatch[2]);
-      const c = parseFloat(mathSumMatch[3]);
-      if (Math.abs((a + b) - c) <= 2) {
-        totalAmount = c.toFixed(2);
-        taxableAmount = a.toFixed(2);
-      }
-    }
-
-    // Subtotal / Taxable amount regex
-    const subMatch = norm.match(/(?:sub\s*[-]?\s*total|gross\s*total|taxable\s*value|taxable\s*amount)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
-    if (subMatch) taxableAmount = parseFloat(subMatch[1]).toFixed(2);
-
-    // Taxes
-    const cgstM = norm.match(/CGST[\s\S]{0,15}?([0-9]+(?:\.[0-9]{1,2})?)/i);
-    const sgstM = norm.match(/SGST[\s\S]{0,15}?([0-9]+(?:\.[0-9]{1,2})?)/i);
-    const igstM = norm.match(/(?:ADD\s*[\:\-]?\s*)?IGST[\s\S]{0,15}?([0-9]+(?:\.[0-9]{1,2})?)/i);
-    const totTaxM = norm.match(/TOTAL\s*TAX[\s\:\=\-₹Rs\.]*\s*([0-9]+(?:\.[0-9]{1,2})?)/i);
-
-    if (cgstM) cgst = parseFloat(cgstM[1]).toFixed(2);
-    if (sgstM) sgst = parseFloat(sgstM[1]).toFixed(2);
-    if (igstM) igst = parseFloat(igstM[1]).toFixed(2);
-    if (totTaxM) totalTax = parseFloat(totTaxM[1]).toFixed(2);
-    else totalTax = (parseFloat(cgst) + parseFloat(sgst) + parseFloat(igst)).toFixed(2);
-
-    // Multi-Layer Grand Total Extraction
-    if (totalAmount === '0.00') {
-      const explicitTotalPatterns = [
-        /(?:total\s*amount\s*after\s*tax|total\s*amount\s*after\s*gst|amount\s*after\s*tax)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
-        /(?:total\s*invoice\s*value|final\s*invoice\s*value|invoice\s*value)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
-        /(?:grand\s*total|final\s*total|net\s*payable|amount\s*payable|total\s*payable|total\s*amount\s*payable|bill\s*total|bill\s*amount|net\s*amount)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
-        /(?:(?:mode:\s*[a-z0-9]+\s+)?(?<!sub[- ])\btotal)[:\s\-=₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
-      ];
-
-      for (const pat of explicitTotalPatterns) {
-        const tm = norm.match(pat);
-        if (tm) {
-          const val = parseFloat(tm[1]);
-          if (val > 0 && !['2024', '2025', '2026', '2027'].includes(tm[1])) {
-            totalAmount = val.toFixed(2);
-            break;
-          }
-        }
-      }
-    }
-
-    // Table row ending match (e.g. Total 2 NOS 3,805.00 684.90 4,489.90)
-    if (totalAmount === '0.00') {
-      const rowMatch = norm.match(/(?:^|\n)\s*total[\s\S]{0,60}?([0-9]+(?:\.[0-9]{2}))\s*$/im);
-      if (rowMatch) {
-        const val = parseFloat(rowMatch[1]);
-        if (val > 0 && !['2024', '2025', '2026'].includes(rowMatch[1])) {
-          totalAmount = val.toFixed(2);
-        }
-      }
-    }
-
-    // Arithmetic reconciliation: Taxable + Tax = Total
-    if (totalAmount === '0.00' && parseFloat(taxableAmount) > 0 && parseFloat(totalTax) > 0) {
-      totalAmount = (parseFloat(taxableAmount) + parseFloat(totalTax)).toFixed(2);
-    } else if (totalAmount === '0.00' && parseFloat(taxableAmount) > 0) {
-      totalAmount = taxableAmount;
-    }
-  }
-
-  // 6. Extracted Line Items
-  const items = [];
-  const itemLineRegex = /(?:^\d+[\.\)]?\s+)?([A-Za-z0-9\s\-\.\&]{4,30})\s+(\d+)\s+([0-9]+(?:\.[0-9]{1,2})?)\s+([0-9]+(?:\.[0-9]{1,2})?)/gm;
-  let im;
-  while ((im = itemLineRegex.exec(allText)) !== null) {
-    if (!/total|subtotal|cgst|sgst|gstin|date|cash/i.test(im[1])) {
-      items.push({
-        item_name: im[1].trim(),
-        quantity: parseFloat(im[2]) || 1,
-        unit_price: parseFloat(im[3]) || 0,
-        total: parseFloat(im[4]) || 0,
-      });
-    }
-  }
-
-  // 7. Payment Mode
-  let paymentMode = 'Cash';
-  if (/upi|gpay|phonepe|paytm/i.test(allText)) paymentMode = 'UPI';
-  else if (/card|visa|mastercard|debit|credit/i.test(allText)) paymentMode = 'Card';
-  else if (/net\s*banking|neft|rtgs|imps/i.test(allText)) paymentMode = 'Net Banking';
-
-  return {
-    supplierName,
-    supplierAddress,
-    supplierGSTIN: supplierGSTIN || gstinInfo.supplierGSTIN || '',
-    customerGSTIN: gstinInfo.customerGSTIN || '',
-    customerName: '',
-    customerAddress: '',
-    invoiceNumber,
-    invoiceDate,
-    taxableAmount,
-    cgst,
-    sgst,
-    igst,
-    totalTax,
-    totalAmount,
-    paymentMode,
-    items,
-    gstStatus: (supplierGSTIN || gstinInfo.supplierGSTIN)
-      ? 'Verified'
-      : 'GSTIN Not Provided',
-  };
-}
-

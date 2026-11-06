@@ -71,8 +71,9 @@ export default async function handler(req, res) {
           .select('*, bill_items(*)')
           .order('created_at', { ascending: false });
 
-        if (userId && userId !== 'all') {
-          query = query.or(`user_id.eq.${userId},user_id.eq.usr_sts_default`);
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId || '');
+        if (isUUID) {
+          query = query.eq('user_id', userId);
         }
 
         if (status && status !== 'all') {
@@ -261,18 +262,31 @@ export default async function handler(req, res) {
       let savedInSupabase = false;
       if (isSupabaseConfigured && supabaseServer) {
         try {
-          const { error: insertError } = await supabaseServer
-            .from('bills')
-            .upsert(billRecord, { onConflict: 'id' });
+          const isUserUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId || '');
+          const isBillUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(billId || '');
+          
+          const supaRecord = { ...billRecord };
+          if (!isUserUUID) delete supaRecord.user_id;
+          if (!isBillUUID) delete supaRecord.id;
+          // Clean base64 strings from DB row
+          if (supaRecord.original_image_url && supaRecord.original_image_url.startsWith('data:')) supaRecord.original_image_url = '';
+          if (supaRecord.enhanced_image_url && supaRecord.enhanced_image_url.startsWith('data:')) supaRecord.enhanced_image_url = '';
+          if (supaRecord.receipt_image_path && supaRecord.receipt_image_path.startsWith('data:')) supaRecord.receipt_image_path = '';
 
-          if (!insertError) {
+          const { data: supaSaved, error: insertError } = await supabaseServer
+            .from('bills')
+            .insert(supaRecord)
+            .select()
+            .single();
+
+          if (!insertError && supaSaved) {
             savedInSupabase = true;
 
             // Insert line items if present
             const items = Array.isArray(body.items) ? body.items : [];
             if (items.length > 0) {
               const itemRows = items.map((it) => ({
-                bill_id: billId,
+                bill_id: supaSaved.id,
                 item_name: it.item_name || it.name || 'Item',
                 hsn_sac_code: it.hsn_sac_code || it.hsn || '',
                 quantity: parseFloat(it.quantity || it.qty) || 1,
@@ -283,6 +297,12 @@ export default async function handler(req, res) {
               }));
 
               await supabaseServer.from('bill_items').insert(itemRows);
+            }
+          }
+        } catch (dbErr) {
+          console.warn('Supabase DB write notice:', dbErr);
+        }
+      }
             }
           } else {
             console.warn('[Supabase] Insert notice:', insertError.message);

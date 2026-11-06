@@ -173,10 +173,10 @@ export async function processBillImageOpenCV(dataUrl) {
   }
   const thresholdUrl = threshCanvas.toDataURL('image/jpeg', 0.90);
 
-  // 6. Pass 4 Image: High-Resolution Bottom / Footer 35% Section Crop
-  // Crops bottom 35% of the receipt at 2x zoom resolution specifically to guarantee footer GSTINs & totals
+  // 6. Pass 3 Image: High-Resolution Bottom / Footer 48% Section Crop
+  // Crops bottom 48% of receipt at high resolution specifically to guarantee footer GSTINs & totals
   const footerCropCanvas = document.createElement('canvas');
-  const cropStartY = Math.floor(h * 0.65);
+  const cropStartY = Math.floor(h * 0.52);
   const cropH = h - cropStartY;
   footerCropCanvas.width = w;
   footerCropCanvas.height = cropH;
