@@ -45,23 +45,43 @@ function validateGSTINChecksum(gstin) {
   return checkChar === calculatedChar;
 }
 
+// Visual OCR character confusions for Indian GSTIN check digits & tokens
+const CONFUSABLES = {
+  'V': ['Y', 'U', 'W'],
+  'Y': ['V'],
+  '8': ['B', '9'],
+  'B': ['8'],
+  '0': ['O', 'D', 'Q'],
+  'O': ['0', 'C'],
+  'C': ['0', 'O', 'G'],
+  '1': ['I', 'L', 'T'],
+  'I': ['1', 'L', 'T'],
+  '5': ['S'],
+  'S': ['5', '3'],
+  '2': ['Z'],
+  'Z': ['2'],
+};
+
 function normalizeAndCorrectGSTIN(raw) {
   if (!raw) return { gstin: '', isValid: false };
-  let str = raw.toUpperCase().replace(/[^0-9A-Z]/g, '');
-  if (str.length < 15) return { gstin: '', isValid: false };
-  if (str.length > 15) str = str.slice(0, 15);
-  const chars = str.split('');
+  let s = String(raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (s.length < 13) return { gstin: '', isValid: false };
+  if (s.length === 14) s = s + 'Z';
+  if (s.length > 15) s = s.slice(0, 15);
+
+  const rawChars = s.split('');
+  const chars = [...rawChars];
 
   // State code digits
+  if (chars[0] === 'T' || chars[0] === 'S') chars[0] = '3';
+  if (chars[1] === 'S' || chars[1] === 'T') chars[1] = '3';
   if (['O', 'D', 'Q'].includes(chars[0])) chars[0] = '0';
   if (['I', 'L', 'T'].includes(chars[0])) chars[0] = '1';
   if (chars[0] === 'Z') chars[0] = '2';
-  if (chars[0] === 'S') chars[0] = '3';
 
   if (['O', 'D', 'Q'].includes(chars[1])) chars[1] = '0';
   if (['I', 'L'].includes(chars[1])) chars[1] = '1';
   if (chars[1] === 'Z') chars[1] = '2';
-  if (chars[1] === 'S') chars[1] = '3';
 
   // PAN letters
   for (let i = 2; i < 7; i++) {
@@ -82,7 +102,7 @@ function normalizeAndCorrectGSTIN(raw) {
 
   // 12th letter
   if (chars[11] === '0') chars[11] = 'O';
-  if (chars[11] === '1') chars[11] = 'I';
+  if (chars[11] === '4') chars[11] = 'A';
 
   // 13th entity number
   if (['I', 'L'].includes(chars[12])) chars[12] = '1';
@@ -91,25 +111,57 @@ function normalizeAndCorrectGSTIN(raw) {
   // 14th always Z
   chars[13] = 'Z';
 
-  // 15th calculated check character
-  const prefix14 = chars.slice(0, 14).join('');
-  const calculated15 = calculateGSTINCheckDigit(prefix14);
-  const candA = prefix14 + (calculated15 || chars[14]);
+  // Test candidate permutations
+  const pos2Opts = (chars[2] === 'O' || chars[2] === '0' || chars[2] === 'C') ? ['C', 'O'] : [chars[2]];
+  const pos5Opts = (chars[5] === 'F' || chars[5] === 'P') ? ['P', 'F'] : [chars[5]];
+  const origCheck = rawChars[14] || '';
 
-  if (validateGSTINChecksum(candA)) return { gstin: candA, isValid: true };
+  const evaluated = [];
 
-  // Permutation: 'O' vs 'C' at index 2
-  if (chars[2] === 'O') {
-    const pChars = [...chars];
-    pChars[2] = 'C';
-    const p14 = pChars.slice(0, 14).join('');
-    const p15 = calculateGSTINCheckDigit(p14);
-    const candP = p14 + p15;
-    if (validateGSTINChecksum(candP)) return { gstin: candP, isValid: true };
+  for (const p2 of pos2Opts) {
+    for (const p5 of pos5Opts) {
+      const cand = [...chars];
+      cand[2] = p2;
+      cand[5] = p5;
+      const c14 = cand.slice(0, 14).join('');
+      const calculatedCheck = calculateGSTINCheckDigit(c14);
+      if (!calculatedCheck) continue;
+
+      const fullCandidate = c14 + calculatedCheck;
+      const stateCode = fullCandidate.slice(0, 2);
+      const isStateValid = Boolean(GST_STATE_MAP[stateCode]);
+      const panStatusChar = fullCandidate[5];
+      const isPanStatusValid = ['P', 'C', 'F', 'H', 'A', 'T', 'B', 'L', 'J', 'G'].includes(panStatusChar);
+
+      let score = 0;
+      if (isStateValid) score += 40;
+      if (isPanStatusValid) score += 30;
+
+      if (origCheck === calculatedCheck) {
+        score += 50;
+      } else if (CONFUSABLES[calculatedCheck] && CONFUSABLES[calculatedCheck].includes(origCheck)) {
+        score += 45;
+      } else if (CONFUSABLES[origCheck] && CONFUSABLES[origCheck].includes(calculatedCheck)) {
+        score += 45;
+      }
+
+      evaluated.push({
+        gstin: fullCandidate,
+        score,
+        isValid: isStateValid && validateGSTINChecksum(fullCandidate),
+      });
+    }
   }
 
-  const sc = candA.slice(0, 2);
-  return { gstin: candA, isValid: Boolean(GST_STATE_MAP[sc]) };
+  evaluated.sort((a, b) => b.score - a.score);
+
+  if (evaluated.length > 0 && evaluated[0].isValid) {
+    return { gstin: evaluated[0].gstin, isValid: true };
+  }
+
+  const fallback = chars.slice(0, 14).join('') + (calculateGSTINCheckDigit(chars.slice(0, 14).join('')) || chars[14] || '1');
+  const sc = fallback.slice(0, 2);
+  return { gstin: fallback, isValid: Boolean(GST_STATE_MAP[sc]) };
 }
 
 function extractGSTIN(text) {

@@ -65,33 +65,52 @@ export function validateGSTINChecksum(gstin) {
   return checkChar === calculatedChar;
 }
 
+// Visual OCR character confusions for Indian GSTIN check digits & tokens
+const CONFUSABLES = {
+  'V': ['Y', 'U', 'W'],
+  'Y': ['V'],
+  '8': ['B', '9'],
+  'B': ['8'],
+  '0': ['O', 'D', 'Q'],
+  'O': ['0', 'C'],
+  'C': ['0', 'O', 'G'],
+  '1': ['I', 'L', 'T'],
+  'I': ['1', 'L', 'T'],
+  '5': ['S'],
+  'S': ['5', '3'],
+  '2': ['Z'],
+  'Z': ['2'],
+};
+
 /**
  * Intelligently normalizes and corrects OCR characters in a GSTIN candidate
  * Handles common OCR distortions: O/0, I/1, S/5, B/8, Z/2, C/0, V/Y.
+ * Uses Modulo-36 mathematical scoring across permutations.
  * @param {string} raw - Raw candidate string
  * @returns {{ gstin: string, isValid: boolean, original: string, confidence: number }}
  */
 export function normalizeAndCorrectGSTIN(raw) {
   if (!raw) return { gstin: '', isValid: false, original: '', confidence: 0 };
-  let str = raw.toUpperCase().replace(/[^0-9A-Z]/g, '');
-  if (str.length < 15) return { gstin: '', isValid: false, original: raw, confidence: 0 };
-  if (str.length > 15) str = str.slice(0, 15);
+  let s = String(raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (s.length < 13) return { gstin: '', isValid: false, original: raw, confidence: 0 };
+  if (s.length === 14) s = s + 'Z';
+  if (s.length > 15) s = s.slice(0, 15);
 
-  const chars = str.split('');
+  const rawChars = s.split('');
+  const chars = [...rawChars];
 
   // 1. First 2 characters: State Code (Digits 0-9)
+  if (chars[0] === 'T' || chars[0] === 'S') chars[0] = '3';
+  if (chars[1] === 'S' || chars[1] === 'T') chars[1] = '3';
   if (chars[0] === 'O' || chars[0] === 'D' || chars[0] === 'Q') chars[0] = '0';
-  if (chars[0] === 'I' || chars[0] === 'L' || chars[0] === 'T') chars[0] = '1';
-  if (chars[0] === 'Z') chars[0] = '2';
-  if (chars[0] === 'S') chars[0] = '3';
-
   if (chars[1] === 'O' || chars[1] === 'D' || chars[1] === 'Q') chars[1] = '0';
+  if (chars[0] === 'I' || chars[0] === 'L') chars[0] = '1';
   if (chars[1] === 'I' || chars[1] === 'L') chars[1] = '1';
+  if (chars[0] === 'Z') chars[0] = '2';
   if (chars[1] === 'Z') chars[1] = '2';
-  if (chars[1] === 'S') chars[1] = '3';
 
-  // 2. Next 5 characters: PAN Letters (A-Z)
-  for (let i = 2; i < 7; i++) {
+  // 2. Next 5 characters: PAN Letters (chars 2 to 6)
+  for (let i = 2; i <= 6; i++) {
     if (chars[i] === '0') chars[i] = 'O';
     if (chars[i] === '1') chars[i] = 'I';
     if (chars[i] === '5') chars[i] = 'S';
@@ -99,69 +118,89 @@ export function normalizeAndCorrectGSTIN(raw) {
     if (chars[i] === '2') chars[i] = 'Z';
   }
 
-  // 3. Next 4 characters: PAN Numbers (0-9)
-  for (let i = 7; i < 11; i++) {
-    if (chars[i] === 'O' || chars[i] === 'D' || chars[i] === 'Q') chars[i] = '0';
-    if (chars[i] === 'I' || chars[i] === 'L') chars[i] = '1';
+  // 3. Next 4 characters: PAN Numbers (chars 7 to 10)
+  for (let i = 7; i <= 10; i++) {
+    if (['O', 'D', 'Q'].includes(chars[i])) chars[i] = '0';
+    if (['I', 'L', 'T'].includes(chars[i])) chars[i] = '1';
+    if (chars[i] === 'Z') chars[i] = '2';
     if (chars[i] === 'S') chars[i] = '5';
     if (chars[i] === 'B') chars[i] = '8';
-    if (chars[i] === 'Z') chars[i] = '2';
   }
 
-  // 4. 12th character: PAN Check Letter (A-Z)
+  // 4. 12th character: PAN Check Letter (char 11)
   if (chars[11] === '0') chars[11] = 'O';
-  if (chars[11] === '1') chars[11] = 'I';
-  if (chars[11] === '5') chars[11] = 'S';
-  if (chars[11] === '8') chars[11] = 'B';
+  if (chars[11] === '4') chars[11] = 'A';
 
-  // 5. 13th character: Entity Number (1-9, A-Z)
+  // 5. 13th character: Entity Number (char 12)
   if (chars[12] === 'I' || chars[12] === 'L') chars[12] = '1';
   if (chars[12] === 'O') chars[12] = '0';
 
   // 6. 14th character: Always 'Z' by default in Indian GSTIN
   chars[13] = 'Z';
 
-  // Candidate A: Direct calculated check digit
-  const prefix14 = chars.slice(0, 14).join('');
-  const calculated15 = calculateGSTINCheckDigit(prefix14);
-  const candidateA = prefix14 + (calculated15 || chars[14]);
+  // Test candidate permutations for pos 2 (C vs O) and pos 5 (P vs F)
+  const pos2Opts = (chars[2] === 'O' || chars[2] === '0' || chars[2] === 'C') ? ['C', 'O'] : [chars[2]];
+  const pos5Opts = (chars[5] === 'F' || chars[5] === 'P') ? ['P', 'F'] : [chars[5]];
+  const origCheck = rawChars[14] || '';
 
-  if (validateGSTINChecksum(candidateA)) {
-    return { gstin: candidateA, isValid: true, original: raw, confidence: 98 };
-  }
+  const evaluated = [];
 
-  // Permutation Test: Common OCR swap in Position 2: 'O' vs 'C' (e.g. CMOPS vs OMOPS)
-  if (chars[2] === 'O') {
-    const permChars = [...chars];
-    permChars[2] = 'C';
-    const perm14 = permChars.slice(0, 14).join('');
-    const perm15 = calculateGSTINCheckDigit(perm14);
-    const candidatePerm = perm14 + perm15;
-    if (validateGSTINChecksum(candidatePerm)) {
-      return { gstin: candidatePerm, isValid: true, original: raw, confidence: 97 };
+  for (const p2 of pos2Opts) {
+    for (const p5 of pos5Opts) {
+      const cand = [...chars];
+      cand[2] = p2;
+      cand[5] = p5;
+      const c14 = cand.slice(0, 14).join('');
+      const calculatedCheck = calculateGSTINCheckDigit(c14);
+      if (!calculatedCheck) continue;
+
+      const fullCandidate = c14 + calculatedCheck;
+      const stateCode = fullCandidate.slice(0, 2);
+      const isStateValid = Boolean(GST_STATE_MAP[stateCode]);
+      const panStatusChar = fullCandidate[5];
+      const isPanStatusValid = ['P', 'C', 'F', 'H', 'A', 'T', 'B', 'L', 'J', 'G'].includes(panStatusChar);
+
+      let score = 0;
+      if (isStateValid) score += 40;
+      if (isPanStatusValid) score += 30;
+
+      if (origCheck === calculatedCheck) {
+        score += 50; // Exact mathematical check digit match!
+      } else if (CONFUSABLES[calculatedCheck] && CONFUSABLES[calculatedCheck].includes(origCheck)) {
+        score += 45; // Visual OCR confusion match (e.g. V vs Y)!
+      } else if (CONFUSABLES[origCheck] && CONFUSABLES[origCheck].includes(calculatedCheck)) {
+        score += 45;
+      }
+
+      evaluated.push({
+        gstin: fullCandidate,
+        score,
+        isValid: isStateValid && validateGSTINChecksum(fullCandidate),
+        calculatedCheck,
+      });
     }
   }
 
-  // Permutation Test: Common OCR swap in Position 6: 'P' vs 'F'
-  if (chars[5] === 'F') {
-    const permChars = [...chars];
-    permChars[5] = 'P';
-    const perm14 = permChars.slice(0, 14).join('');
-    const perm15 = calculateGSTINCheckDigit(perm14);
-    const candidatePerm = perm14 + perm15;
-    if (validateGSTINChecksum(candidatePerm)) {
-      return { gstin: candidatePerm, isValid: true, original: raw, confidence: 96 };
-    }
+  evaluated.sort((a, b) => b.score - a.score);
+
+  if (evaluated.length > 0 && evaluated[0].isValid) {
+    const best = evaluated[0];
+    return {
+      gstin: best.gstin,
+      isValid: true,
+      original: raw,
+      confidence: Math.min(99, best.score),
+    };
   }
 
-  const stateCode = candidateA.slice(0, 2);
-  const stateValid = Boolean(GST_STATE_MAP[stateCode]);
-
+  // Fallback candidate
+  const fallback = chars.slice(0, 14).join('') + (calculateGSTINCheckDigit(chars.slice(0, 14).join('')) || chars[14] || '1');
+  const sc = fallback.slice(0, 2);
   return {
-    gstin: candidateA,
-    isValid: stateValid,
+    gstin: fallback,
+    isValid: Boolean(GST_STATE_MAP[sc]) && validateGSTINChecksum(fallback),
     original: raw,
-    confidence: stateValid ? 85 : 50,
+    confidence: Boolean(GST_STATE_MAP[sc]) ? 70 : 40,
   };
 }
 
@@ -402,8 +441,8 @@ export function extractStructuredFinancialFields(mainText, footerText, gstinInfo
     /(?:grand\s*total|final\s*total|bill\s*total|bill\s*amount)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
     // 2. Explicit CASH or PAID line (like Hotel Roopali: CASH 224.00)
     /(?:^|\n)\s*cash[\s\:\=\-₹Rs\.]*\s*([0-9]+(?:\.[0-9]{1,2})?)/im,
-    // 3. Direct Total label anywhere on a line (e.g. "Total : 2753.00", "Total 950.00", "Items: 5 Total : 2753.00")
-    /(?<!sub[- ]|taxable\s*)\btotal[\s\:\=\-₹Rs.§X¥T#|]*\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
+    // 3. Direct Total label anywhere on a line (handles OCR typos: totel, dotel, rotal, tota, wal;)
+    /(?<!sub[- ]|taxable\s*|gross\s*)\b(?:total|totel|dotel|tatal|tota|rotal|wal[;\:])[\s\:\=\-₹Rs.§X¥T#|]*\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
   ];
 
   for (const pat of totalPatterns) {
@@ -419,18 +458,32 @@ export function extractStructuredFinancialFields(mainText, footerText, gstinInfo
 
   // Arithmetic Reconciliation (Invoice-Data-Extractor principle):
   // Check if Subtotal + Tax - Discount = Candidate Total
-  const subNum = parseFloat(taxableAmount);
-  const taxNum = parseFloat(totalTax);
-  const discNum = parseFloat(discount);
+  const subNum = parseFloat(taxableAmount) || 0;
+  const taxNum = parseFloat(totalTax) || 0;
+  const discNum = parseFloat(discount) || 0;
+  let totalNum = parseFloat(totalAmount) || 0;
 
-  if (subNum > 0) {
-    const expectedTotal = subNum + taxNum - discNum;
-    if (totalAmount === '0.00' && expectedTotal > 0) {
-      totalAmount = expectedTotal.toFixed(2);
-    } else if (Math.abs(parseFloat(totalAmount) - expectedTotal) <= 2.0) {
-      // Reconciled within small rounding variance
-      totalAmount = parseFloat(totalAmount).toFixed(2);
+  if (subNum > 0 && discNum > 0) {
+    // Law of pharmacy & retail discounts: Grand Total = Subtotal - Discount
+    const mathNet = subNum - discNum;
+    const roundedNet = Math.round(mathNet);
+    // If no total extracted, or if extracted total is far off (e.g. OCR misread total line as PBEZ.00 or picked up another number)
+    if (totalNum <= 0 || Math.abs(totalNum - mathNet) > 4.0) {
+      if (Math.abs(roundedNet - mathNet) <= 0.5) {
+        totalAmount = roundedNet.toFixed(2);
+      } else {
+        totalAmount = mathNet.toFixed(2);
+      }
+    } else if (Math.abs(roundedNet - totalNum) <= 1.0) {
+      totalAmount = totalNum.toFixed(2);
     }
+  } else if (subNum > 0 && taxNum > 0) {
+    const mathSum = subNum + taxNum;
+    if (totalNum <= 0 || Math.abs(totalNum - mathSum) > 4.0) {
+      totalAmount = mathSum.toFixed(2);
+    }
+  } else if (subNum > 0 && totalNum <= 0) {
+    totalAmount = subNum.toFixed(2);
   }
 
   // Mathematical addition line search (e.g. 5840 + 650 = 6490)

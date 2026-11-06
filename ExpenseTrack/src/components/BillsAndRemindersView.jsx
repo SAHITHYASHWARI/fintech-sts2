@@ -156,16 +156,13 @@ function normalizeGSTINCandidate(raw) {
   if (s.length > 15) s = s.slice(0, 15);
   const chars = s.split('');
 
-  if (/KARNATAKA|MANDYA|YEDIYUR|NAGAMANGALA|BELLUR|572142|DHRUVATHARE/i.test(rawStr) || (chars[0] === '2' && /AADCL/i.test(s))) {
-    chars[0] = '2';
-    chars[1] = '9';
-  } else {
-    if (chars[0] === 'J' || chars[0] === ']' || chars[0] === 'T' || chars[0] === 'O') chars[0] = '3';
-    if (chars[0] === '3' && (chars[1] === 'I' || chars[1] === 'J' || chars[1] === ']' || chars[1] === '7' || chars[1] === 'O')) chars[1] = '3';
-    if (chars[0] === 'O') chars[0] = '0';
-    if (chars[1] === 'O') chars[1] = '0';
-    if (chars[1] === 'I' || chars[1] === 'L') chars[1] = '1';
-  }
+  if (chars[0] === 'J' || chars[0] === ']' || chars[0] === 'T' || chars[0] === 'S') chars[0] = '3';
+  if (chars[0] === '3' && (chars[1] === 'I' || chars[1] === 'J' || chars[1] === ']' || chars[1] === '7' || chars[1] === 'S' || chars[1] === 'T')) chars[1] = '3';
+  if (chars[0] === 'O' || chars[0] === 'D') chars[0] = '0';
+  if (chars[1] === 'O' || chars[1] === 'D') chars[1] = '0';
+  if (chars[1] === 'I' || chars[1] === 'L') chars[1] = '1';
+  if (chars[0] === 'Z') chars[0] = '2';
+  if (chars[1] === 'Z') chars[1] = '2';
 
   for (let i = 2; i <= 6; i++) {
     if (chars[i] === '0') chars[i] = 'O';
@@ -436,116 +433,7 @@ const decodeGSTIN = (rawGstin) => {
   };
 };
 
-const extractGSTIN = (ocrText) => {
-  if (!ocrText) return null;
 
-  // Contextual precision fallbacks for verified bill templates
-  if (/RAMRAJ|COTTON[- ]LINEN|VENNILA|SUKRA/i.test(ocrText) && (/33|AAHFR|2641|F1Z|CHITTOOR/i.test(ocrText))) {
-    return {
-      gstin: '33AAHFR2641F1ZI',
-      stateCode: '33',
-      stateName: 'Tamil Nadu',
-      pan: 'AAHFR2641F',
-      isValid: true,
-      checksumValid: true,
-      inRegistry: true,
-    };
-  }
-  if (/ARUNAI|rEDILAS|HATCHERRY|KATCHERY|TIRUPATTUR|03_arunai/i.test(ocrText) && (/33|TOMP|CMOP|3767|MEDIC/i.test(ocrText))) {
-    return {
-      gstin: '33CMOPS3767A1ZV',
-      stateCode: '33',
-      stateName: 'Tamil Nadu',
-      pan: 'CMOPS3767A',
-      isValid: true,
-      checksumValid: true,
-      inRegistry: true,
-    };
-  }
-  if (/MASHA|MAA\s*HOSPITAL|VALLIMALAI/i.test(ocrText) && (/33|ACEFM|3457|PHARM/i.test(ocrText))) {
-    return {
-      gstin: '33ACEFM3457F1Z0',
-      stateCode: '33',
-      stateName: 'Tamil Nadu',
-      pan: 'ACEFM3457F',
-      isValid: true,
-      checksumValid: true,
-      inRegistry: true,
-    };
-  }
-  if (/GODREJ|PREMIER|ROTI\s*MAKER|445378/i.test(ocrText) && (/33|BBBP|4794|Katpadi/i.test(ocrText))) {
-    return {
-      gstin: '33BBBPB4794A1Z9',
-      stateCode: '33',
-      stateName: 'Tamil Nadu',
-      pan: 'BBBPB4794A',
-      isValid: true,
-      checksumValid: true,
-      inRegistry: true,
-    };
-  }
-  if (/MURUGAN|PEPSICO|KONAVATTAM|SAKTHI\s*NAGAR/i.test(ocrText) && (/33|JA|ANDPB|6735|SFIZF/i.test(ocrText))) {
-    return {
-      gstin: '33ANDPB6735F1ZF',
-      stateCode: '33',
-      stateName: 'Tamil Nadu',
-      pan: 'ANDPB6735F',
-      isValid: true,
-      checksumValid: true,
-      inRegistry: true,
-    };
-  }
-  const lines = ocrText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const nonTableLines = lines.filter(l => {
-    if (/[\/\%]/.test(l) && /TRUNK|BANIAN|SHIRT|BAG|CODE|RATE|QTY|HSN|ITEM/i.test(l)) return false;
-    if (/\b(?:6107|6109|3923|HSN|SAC)\b/i.test(l) && /[\/\%]/.test(l)) return false;
-    return true;
-  });
-  const filteredText = nonTableLines.join('\n');
-
-  const candidates = [];
-  const addCandidate = (raw, src) => {
-    const norm = normalizeGSTINCandidate(raw);
-    if (!norm) return;
-    const isValidChecksum = validateGSTChecksum(norm);
-    const inRegistry = VERIFIED_ENTERPRISE_REGISTRY[norm];
-    let score = 0;
-    if (inRegistry) score += 500;
-    if (isValidChecksum) score += 900;
-    if (/GSTIN|GST\s*NO/i.test(src)) score += 300;
-    else if (/IR\s*:/i.test(src)) score += 200;
-    if (norm.startsWith('33')) score += 100;
-    candidates.push({ gstin: norm, score, isValidChecksum, inRegistry: Boolean(inRegistry) });
-  };
-
-  const labelRegex = /(?:GSTIN|GST\s*NO\.?|GST\s*NUMBER|GST|TIN|SAC[^\n:]*?IR|IR)[:\s\-\.\/]*([0-9A-Za-z \-\.\!\|]{12,22})/gi;
-  let lm;
-  while ((lm = labelRegex.exec(filteredText)) !== null) {
-    addCandidate(lm[1], lm[0]);
-  }
-
-  const wordRegex = /\b([0-9]{2}[A-Za-z0-9]{13})\b/g;
-  let wm;
-  while ((wm = wordRegex.exec(filteredText)) !== null) {
-    addCandidate(wm[1], wm[0]);
-  }
-
-  candidates.sort((a, b) => b.score - a.score);
-  if (candidates.length > 0 && candidates[0].score >= 300) {
-    const best = candidates[0];
-    const stateCode = best.gstin.slice(0, 2);
-    return {
-      gstin: best.gstin,
-      stateCode,
-      stateName: GST_STATE_MAP[stateCode] || 'Tamil Nadu',
-      pan: best.gstin.slice(2, 12),
-      isValid: true,
-      checksumValid: best.isValidChecksum,
-      inRegistry: best.inRegistry,
-    };
-  }
-  return null;
-};
 
 const MULTI_BILL_PRESETS = [
   {
@@ -1341,7 +1229,7 @@ export default function BillsAndRemindersView({ currentUser }) {
       setOcrTotal(f.totalAmount || '0.00');
       setOcrSubtotal(f.taxableAmount || f.totalAmount || '0.00');
       setOcrTax(f.totalTax || '0.00');
-      setOcrDiscount('0.00');
+      setOcrDiscount(f.discount || '0.00');
       setOcrDate(f.invoiceDate || new Date().toISOString().split('T')[0]);
       setOcrPaymentMode(f.paymentMode || 'Cash');
       setOcrInvoiceRef(f.invoiceNumber ? `Bill No: ${f.invoiceNumber}` : `INV-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -1353,7 +1241,7 @@ export default function BillsAndRemindersView({ currentUser }) {
       setIsImageBlurry(false);
       setBlurWarningMessage('');
 
-      // Build visual overlay chips covering 100% of the entire bill (top to bottom)
+      // Build visual overlay chips covering 100% of the entire bill (top to bottom & left to right)
       const lines = (ocrResult.rawText || fullText).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       const boxes = [];
       const totalLines = Math.max(1, lines.length);
@@ -1364,11 +1252,11 @@ export default function BillsAndRemindersView({ currentUser }) {
         boxes.push({
           id: `box-${idx}`,
           text: line,
-          confidence: 96,
-          pctLeft: 6,
+          confidence: 98,
+          pctLeft: 4,
           pctTop: topPct,
-          pctWidth: Math.min(88, Math.max(25, line.length * 2.3)),
-          pctHeight: Math.max(1.6, Math.min(3.2, 85 / totalLines)),
+          pctWidth: 92, // Spans full width across left margin to right margin!
+          pctHeight: Math.max(1.8, Math.min(3.4, 88 / totalLines)),
         });
       });
       setDetectedBoxes(boxes);
@@ -1538,12 +1426,24 @@ export default function BillsAndRemindersView({ currentUser }) {
   // Save Scanned Receipt with Instant Optimistic UI, Quota-Safe LocalStorage & Background Supabase Sync
   const handleSaveScannedReceipt = async (paymentStatus = 'paid') => {
     setIsSavingBill(true);
-    let totalNum = parseFloat(ocrTotal);
-    if (isNaN(totalNum) || totalNum <= 0) {
-      const sub = parseFloat(ocrSubtotal) || 0;
-      const tx = parseFloat(ocrTax) || 0;
-      if (sub > 0 || tx > 0) {
-        totalNum = sub + tx;
+
+    const cleanNum = (val) => {
+      if (!val) return 0;
+      const clean = String(val).replace(/[^0-9.]/g, '');
+      const n = parseFloat(clean);
+      return isNaN(n) ? 0 : n;
+    };
+
+    let totalNum = cleanNum(ocrTotal);
+    const subNum = cleanNum(ocrSubtotal);
+    const txNum = cleanNum(ocrTax);
+    const discNum = cleanNum(ocrDiscount);
+
+    if (totalNum <= 0) {
+      if (subNum > 0 && discNum > 0) {
+        totalNum = subNum - discNum;
+      } else if (subNum > 0 || txNum > 0) {
+        totalNum = subNum + txNum;
       } else {
         totalNum = 1.00;
       }
@@ -1553,10 +1453,9 @@ export default function BillsAndRemindersView({ currentUser }) {
     const merchantToSave = (ocrMerchant || 'Verified Merchant').trim();
     const finalTotal = isNaN(totalNum) || totalNum <= 0 ? 1.00 : totalNum;
 
-    // Safety: Large data: URLs (>40KB) cause QuotaExceededError in browser LocalStorage.
-    // Use lightweight safe string for local ledger; cloud sync uploads full photo to Supabase storage.
-    const isOrigLarge = originalImageUrl && originalImageUrl.startsWith('data:') && originalImageUrl.length > 40000;
-    const isEnhLarge = enhancedImageUrl && enhancedImageUrl.startsWith('data:') && enhancedImageUrl.length > 40000;
+    // Safety: Large data: URLs (>20KB) cause QuotaExceededError in browser LocalStorage.
+    const isOrigLarge = originalImageUrl && originalImageUrl.startsWith('data:') && originalImageUrl.length > 20000;
+    const isEnhLarge = enhancedImageUrl && enhancedImageUrl.startsWith('data:') && enhancedImageUrl.length > 20000;
 
     let permanentOriginalUrl = isOrigLarge ? '' : (originalImageUrl || receiptPreviewUrl || '');
     let permanentEnhancedUrl = isEnhLarge ? '' : (enhancedImageUrl || receiptPreviewUrl || '');
@@ -1580,11 +1479,11 @@ export default function BillsAndRemindersView({ currentUser }) {
       grand_total: finalTotal,
       total_amount: finalTotal,
       amount: finalTotal,
-      subtotal: parseFloat(ocrSubtotal) || finalTotal,
-      taxable_amount: parseFloat(ocrSubtotal) || finalTotal,
-      tax: parseFloat(ocrTax) || 0,
-      total_tax: parseFloat(ocrTax) || 0,
-      discount: parseFloat(ocrDiscount) || 0,
+      subtotal: subNum || finalTotal,
+      taxable_amount: subNum || finalTotal,
+      tax: txNum || 0,
+      total_tax: txNum || 0,
+      discount: discNum || 0,
       payment_mode: ocrPaymentMode || 'Cash',
       payment_status: paymentStatus,
       status: paymentStatus === 'paid' ? 'Paid' : 'Needs Confirmation',
@@ -1625,8 +1524,20 @@ export default function BillsAndRemindersView({ currentUser }) {
       ];
       keys.forEach((k) => {
         try {
-          const existing = JSON.parse(localStorage.getItem(k) || '[]');
-          const updated = [billPayload, ...existing.filter((b) => b.id !== billPayload.id)];
+          const raw = localStorage.getItem(k);
+          let existing = [];
+          if (raw) {
+            try { existing = JSON.parse(raw); } catch (_) { existing = []; }
+          }
+          if (!Array.isArray(existing)) existing = [];
+          // Strip any heavy base64 to protect browser quota
+          const cleanedExisting = existing.map((b) => ({
+            ...b,
+            original_image_url: b.original_image_url?.startsWith('data:') && b.original_image_url.length > 5000 ? '' : b.original_image_url,
+            enhanced_image_url: b.enhanced_image_url?.startsWith('data:') && b.enhanced_image_url.length > 5000 ? '' : b.enhanced_image_url,
+            receipt_image_path: b.receipt_image_path?.startsWith('data:') && b.receipt_image_path.length > 5000 ? '' : b.receipt_image_path,
+          }));
+          const updated = [billPayload, ...cleanedExisting.filter((b) => b.id !== billPayload.id)];
           localStorage.setItem(k, JSON.stringify(updated.slice(0, 50)));
         } catch (storageErr) {
           console.warn('LocalStorage quota fallback:', storageErr);
@@ -1634,14 +1545,14 @@ export default function BillsAndRemindersView({ currentUser }) {
       });
     } catch (_) { }
 
-    showToast(`✓ Bill "${merchantToSave}" (₹${finalTotal.toFixed(2)}) permanently saved!`);
+    showToast(`✓ Bill "${merchantToSave}" (₹${finalTotal.toFixed(2)}) permanently stored in My Saved Bills!`);
     setIsSavingBill(false);
 
     // Smooth scroll down to My Saved Bills
     setTimeout(() => {
       const el = document.getElementById('my-saved-bills-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
 
     // Refresh analytics
     fetchAnalytics(selectedMonth).catch(() => { });
@@ -3044,7 +2955,7 @@ export default function BillsAndRemindersView({ currentUser }) {
         {/* MY SAVED BILLS & EXPENSES REPOSITORY                              */}
         {/* Search, Filter, GSTIN Badge, Delete & Move to Due Bills           */}
         {/* ═════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+        <div id="my-saved-bills-section" className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center space-x-2">
               <Receipt className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
