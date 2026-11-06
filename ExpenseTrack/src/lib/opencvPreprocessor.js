@@ -69,17 +69,19 @@ function detectDocumentBounds(imgData, w, h) {
   let c0 = 0; while (c0 < cols && colEnergy[c0] < cThresh) c0++;
   let c1 = cols - 1; while (c1 > c0 && colEnergy[c1] < cThresh) c1--;
 
-  const pad = 24;
-  const minY = Math.max(0, r0 * step - pad);
-  const maxY = Math.min(h, (r1 + 1) * step + pad);
-  const minX = Math.max(0, c0 * step - pad);
-  const maxX = Math.min(w, (c1 + 1) * step + pad);
+  const padY = Math.max(90, Math.floor(h * 0.07));
+  const padX = Math.max(70, Math.floor(w * 0.05));
+  const minY = Math.max(0, r0 * step - padY);
+  const maxY = Math.min(h, (r1 + 1) * step + padY);
+  const minX = Math.max(0, c0 * step - padX);
+  const maxX = Math.min(w, (c1 + 1) * step + padX);
 
   const cropW = maxX - minX;
   const cropH = maxY - minY;
 
-  // Crop only if the detected receipt occupies between 15% and 88% of the full image
-  if (cropW > 150 && cropH > 150 && (cropW * cropH) < (w * h * 0.88) && (cropW * cropH) > (w * h * 0.15)) {
+  // Crop only if the detected receipt occupies between 20% and 72% of the full image
+  // (If it fills more than 72%, cropping risks clipping the header or footer!)
+  if (cropW > 200 && cropH > 200 && (cropW * cropH) < (w * h * 0.72) && (cropW * cropH) > (w * h * 0.20)) {
     return { minX, minY, cropW, cropH };
   }
   return null;

@@ -174,23 +174,27 @@ function normalizeAndCorrectGSTIN(raw) {
 
 function extractGSTIN(text) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  // Broader label regex: catches "BST ND:", "GST NO:", "GST IN:", "GSTIN:" etc.
-  const labelRegex = /(?:[GB]S[TI](?:\s*N[O0D]?)?|GSTIN|TIN|UIN)[:\s\=\#\.\-]*([0-9A-Za-z]{12,18})/gi;
+  // Comprehensive label regex: matches GSTIN, TIN, UIN, and OCR variations (5T ND, 6ST NO, BST ND, GST NO)
+  const labelRegex = /(?:GSTIN|TIN|UIN|[G6CQB5][S5$8]?[T7I1l])(?:\s*[Nn][O0D]|[Rr][Ee][Gg]|[Nn][Uu][Mm]|#)?[:\s\=\#\.\-~]*/gi;
   const standaloneRegex = /\b([0-9TOISBZE]{2}[A-Za-z0158]{5}[0-9OISB]{4}[A-Za-z0158]{1}[0-9A-Za-z]{1}[Zz2][0-9A-Za-z]{1})\b/g;
 
   let bestGSTIN = '';
   let bestValid = false;
 
   for (const line of lines) {
-    // Pre-clean: replace slashes → 7 so "33CMOPS3/67A1ZV" becomes "33CMOPS3767A1ZV"
-    const cleanLine = line.replace(/\//g, '7').replace(/\\/g, '7');
+    const cleanLine = line.replace(/[\/\\]/g, '7');
     let m;
     while ((m = labelRegex.exec(cleanLine)) !== null) {
-      const p = normalizeAndCorrectGSTIN(m[1]);
-      if (p.gstin && (!bestGSTIN || p.isValid)) {
-        bestGSTIN = p.gstin;
-        bestValid = p.isValid;
-        if (bestValid) return { gstin: bestGSTIN, isValid: true };
+      let after = cleanLine.slice(m.index + m[0].length);
+      after = after.replace(/^[\:\=\-\.\~\|\s]+/, '');
+      const rawToken = after.slice(0, 25).replace(/&/g, '8').replace(/[\/\\]/g, '7').replace(/[^0-9A-Za-z]/g, '').slice(0, 15);
+      if (rawToken.length >= 13) {
+        const p = normalizeAndCorrectGSTIN(rawToken);
+        if (p.gstin && (!bestGSTIN || p.isValid)) {
+          bestGSTIN = p.gstin;
+          bestValid = p.isValid;
+          if (bestValid) return { gstin: bestGSTIN, isValid: true };
+        }
       }
     }
     while ((m = standaloneRegex.exec(cleanLine)) !== null) {
@@ -227,12 +231,27 @@ function parseReceipt(text, fileName = '') {
   // 1. Merchant Name
   let merchant = '';
   const ignoredHeaderKeywords = /^(?:tax\s*invoice|retail\s*invoice|invoice|bill|cash\s*bill|cash\s*memo|estimate|receipt|quotation|original|duplicate|triplicate|welcome|thank\s*you|customer|table|order|date|gstin|phone|tel|cin|pan|dl\.?no)/i;
+  const businessKeywords = /\b(pharmacy|medical|medicals?|cotton|kitchen|restaurant|hotel|stores?|mart|traders?|enterprises?|pvt\.?\s*ltd|hospital|clinic|bakery|salon|centre|center|foods?|systems?|services?|agency|agencies|electricals?|hardware|chemicals?|textiles?|garments?|transport|travels?)\b/i;
 
-  for (let i = 0; i < Math.min(8, lines.length); i++) {
-    const l = lines[i].replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
-    if (l.length >= 3 && !ignoredHeaderKeywords.test(l) && !/^\d+$/.test(l)) {
-      merchant = l;
-      break;
+  // Strategy 1: Check lines for business keyword (Medicals, Pharmacy, Kitchen, Cotton, Hotel, etc.)
+  for (const line of lines.slice(0, 15)) {
+    if (businessKeywords.test(line) && !ignoredHeaderKeywords.test(line) && !/^(Customer|Address|Contact|Doctor|Buyer):/i.test(line)) {
+      const cleaned = line.replace(/[^\w\s\.\&\-\/\(\)']/g, '').trim();
+      if (cleaned.length >= 3 && cleaned.length <= 65) {
+        merchant = cleaned;
+        break;
+      }
+    }
+  }
+
+  // Strategy 2: Top lines fallback
+  if (!merchant) {
+    for (let i = 0; i < Math.min(8, lines.length); i++) {
+      const l = lines[i].replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
+      if (l.length >= 3 && !ignoredHeaderKeywords.test(l) && !/^\d+$/.test(l)) {
+        merchant = l;
+        break;
+      }
     }
   }
   if (!merchant) merchant = 'Verified Merchant';

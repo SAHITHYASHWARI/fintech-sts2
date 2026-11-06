@@ -236,8 +236,8 @@ export function extractAllGSTINs(fullText) {
   const candidates = [];
   const totalLines = Math.max(1, lines.length);
 
-  // Pattern 1: Broad label regex catches OCR variants: "BST ND:", "GST NO:", "GST IN:", etc.
-  const labelRegex = /(?:[GB]S[TI](?:\s*N[O0D]?)?|GSTIN|TIN|UIN|DL\.?NO[^:]{0,30}GST\s*N[O0D]?)[:\s\=\#\.\-]*([0-9A-Za-z]{12,18})/gi;
+  // Pattern 1: Broad label regex catches: GSTIN, TIN, UIN, and OCR variants like 5T ND, 6ST NO, BST ND, GST NO
+  const labelRegex = /(?:GSTIN|TIN|UIN|[G6CQB5][S5$8]?[T7I1l])(?:\s*[Nn][O0D]|[Rr][Ee][Gg]|[Nn][Uu][Mm]|#)?[:\s\=\#\.\-~]*/gi;
 
   // Pattern 2: Standalone 15-character token — expanded state code char class (T/E/S/Z for digit confusion)
   const standaloneRegex = /\b([0-9TOISBZE]{2}[A-Za-z0158]{5}[0-9OISB]{4}[A-Za-z0158]{1}[0-9A-Za-z]{1}[Zz2][0-9A-Za-z]{1})\b/g;
@@ -247,32 +247,43 @@ export function extractAllGSTINs(fullText) {
     const nearby = lines.slice(Math.max(0, idx - 2), Math.min(totalLines, idx + 3)).join(' ').toLowerCase();
     const isCustomer = /buyer|customer|billed\s*to|recipient|client/i.test(nearby);
 
-    // Pre-clean the line: replace slashes → 7 so "33CMOPS3/67A1ZV" becomes "33CMOPS3767A1ZV"
-    const cleanLine = line.replace(/\//g, '7').replace(/\\/g, '7');
+    // Pre-clean line: convert slashes/backslashes to 7
+    const cleanLine = line.replace(/[\/\\]/g, '7');
 
-    // Check label regex
+    // 1. Check label regex
     let m;
     while ((m = labelRegex.exec(cleanLine)) !== null) {
-      const parsed = normalizeAndCorrectGSTIN(m[1]);
-      const stateCode = parsed.gstin.slice(0, 2);
-      if (GST_STATE_MAP[stateCode]) {
-        if (!candidates.some((c) => c.gstin === parsed.gstin)) {
-          candidates.push({
-            gstin: parsed.gstin,
-            rawMatch: m[1],
-            lineIndex: idx,
-            verticalPos,
-            isCustomer,
-            stateCode,
-            stateName: GST_STATE_MAP[stateCode],
-            isChecksumValid: parsed.isValid,
-            confidence: parsed.confidence,
-          });
+      let after = cleanLine.slice(m.index + m[0].length);
+      // Strip leading colons, hyphens, tildes, pipes, or spaces (DO NOT strip S - S is digit 3!)
+      after = after.replace(/^[\:\=\-\.\~\|\s]+/, '');
+      const rawToken = after.slice(0, 25)
+        .replace(/&/g, '8')
+        .replace(/[\/\\]/g, '7')
+        .replace(/[^0-9A-Za-z]/g, '')
+        .slice(0, 15);
+
+      if (rawToken.length >= 13) {
+        const parsed = normalizeAndCorrectGSTIN(rawToken);
+        const stateCode = parsed.gstin.slice(0, 2);
+        if (GST_STATE_MAP[stateCode]) {
+          if (!candidates.some((c) => c.gstin === parsed.gstin)) {
+            candidates.push({
+              gstin: parsed.gstin,
+              rawMatch: rawToken,
+              lineIndex: idx,
+              verticalPos,
+              isCustomer,
+              stateCode,
+              stateName: GST_STATE_MAP[stateCode],
+              isChecksumValid: parsed.isValid,
+              confidence: parsed.confidence,
+            });
+          }
         }
       }
     }
 
-    // Check standalone regex on cleaned line
+    // 2. Check standalone regex on cleaned line
     let sm;
     while ((sm = standaloneRegex.exec(cleanLine)) !== null) {
       const parsed = normalizeAndCorrectGSTIN(sm[1]);
@@ -292,8 +303,7 @@ export function extractAllGSTINs(fullText) {
       }
     }
 
-    // Sliding-window word scan: try every word ≥ 13 chars as a GSTIN candidate
-    // Catches cases where the token is on its own line without any label
+    // 3. Sliding-window word scan: try every word ≥ 13 chars as a GSTIN candidate
     const words = cleanLine.replace(/[^A-Z0-9\s]/gi, ' ').split(/\s+/);
     for (const word of words) {
       const w = word.trim();
@@ -310,7 +320,7 @@ export function extractAllGSTINs(fullText) {
             stateCode,
             stateName: GST_STATE_MAP[stateCode],
             isChecksumValid: parsed.isValid,
-            confidence: parsed.confidence - 10, // slight penalty for no label
+            confidence: parsed.confidence - 10,
           });
         }
       }
@@ -341,11 +351,45 @@ export function extractAllGSTINs(fullText) {
 }
 
 /**
+ * Validates whether an OCR line can be a plausible Merchant / Business name
+ * Rejects noise, margin artifacts, isolated single characters, labels, and addresses.
+ */
+function isValidMerchantCandidate(line) {
+  if (!line || typeof line !== 'string') return false;
+  const clean = line.replace(/[^\w\s\.\&\-\/\(\)']/g, '').trim();
+  if (clean.length < 3 || clean.length > 60) return false;
+
+  // Must not match standard bill metadata headers
+  if (/^(?:tax\s*invoice|retail\s*invoice|cash\s*bill|cash\s*memo|estimate|receipt|bill|invoice|original|duplicate|triplicate|quotation|customer|table|order|date|gstin|cell|phone|tel|cin|pan|dl\.?no|reg|hsn|sac|mfr|batch|expiry|qty|rate|amount|values|total|discount|subtotal|taxable|particulars|custname|doctor|address)/i.test(clean)) {
+    return false;
+  }
+
+  // Must not be a postal address line
+  if (/\b(?:street|road|nagar|floor|complex|taluk|dist|pincode|lane|cross|stand|near|opp|\d{6})\b/i.test(clean)) {
+    return false;
+  }
+
+  // Reject lines that are predominantly isolated 1-character tokens or symbols (e.g. "4 J - q - Apter 3 L")
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return false;
+  const singleCharWords = words.filter((w) => w.length <= 1);
+  if (singleCharWords.length >= 2 && singleCharWords.length >= words.length * 0.4) {
+    return false;
+  }
+
+  // Must contain at least 3 alphabetic characters
+  const letters = clean.replace(/[^a-zA-Z]/g, '');
+  if (letters.length < 3) return false;
+
+  return true;
+}
+
+/**
  * Universal Dynamic Financial Field Extraction (Receipt-OCR & Invoice-Data-Extractor Architecture)
  * Extracts: Merchant, Address, Date, Invoice No, Subtotal, Taxes, Discounts, and Grand Total.
  * Uses layout hierarchy and arithmetic reconciliation (Subtotal + Tax - Discount = Total).
  */
-export function extractStructuredFinancialFields(mainText, footerText, gstinInfo, fileName = '', topBBoxLines = []) {
+export function extractStructuredFinancialFields(mainText, footerText, gstinInfo, fileName = '', topBBoxLines = [], allPassTexts = []) {
   const combinedText = `${mainText}\n${footerText}`;
   const lines = combinedText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const norm = combinedText.replace(/(\d),(\d)/g, '$1$2').replace(/(\d),(\d)/g, '$1$2');
@@ -357,31 +401,37 @@ export function extractStructuredFinancialFields(mainText, footerText, gstinInfo
 
   const ignoredHeaderKeywords = /^(?:tax\s*invoice|retail\s*invoice|invoice|bill|cash\s*bill|cash\s*memo|estimate|receipt|quotation|original|duplicate|triplicate|welcome|thank\s*you|customer|table|order|date|gstin|phone|tel|cin|pan|dl\.?no)/i;
   const addressPatterns = /\b(?:street|road|nagar|floor|complex|taluk|dist|lane|cross|stand|near|opp|\d{6})\b/i;
-  const businessKeywords = /\b(pharmacy|medical|medicals?|cotton|kitchen|restaurant|hotel|stores?|mart|traders?|enterprises?|pvt\.?\s*ltd|hospital|clinic|bakery|salon|centre|center|foods?|systems?|services?|agency|agencies|electricals?|hardware|chemicals?|textiles?|garments?)\b/i;
+  const businessKeywords = /\b(pharmacy|medical|medicals?|cotton|kitchen|restaurant|hotel|stores?|mart|traders?|enterprises?|pvt\.?\s*ltd|hospital|clinic|bakery|salon|centre|center|foods?|systems?|services?|agency|agencies|electricals?|hardware|chemicals?|textiles?|garments?|transport|travels?)\b/i;
 
-  // Strategy 1: Use bounding-box-sorted top lines (most reliable — these are sorted by physical Y position)
-  for (const bLine of topBBoxLines) {
-    const l = bLine.replace(/[^\w\s\.\&\-\/\(\)]/g, '').trim();
-    if (l.length < 3 || l.length > 65) continue;
-    if (ignoredHeaderKeywords.test(l)) continue;
-    if (addressPatterns.test(l)) continue;
-    if (/^\d+$/.test(l)) continue;
-    supplierName = l;
-    break;
+  // Build all-pass search pool: topBBoxLines + first 25 lines of every pass text
+  const allPassSearchLines = [...topBBoxLines];
+  for (const passText of allPassTexts) {
+    if (passText) {
+      allPassSearchLines.push(...passText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 25));
+    }
   }
 
-  // Strategy 2: Scan ALL lines for a business-keyword match (catches "MASHA PHARMACY", "RAMRAJ COTTON" etc.)
+  // Strategy 1 (HIGHEST PRIORITY): Match known business keywords (Medicals, Pharmacy, Kitchen, Cotton, Hotel, etc.)
+  for (const candidateLine of allPassSearchLines) {
+    if (
+      businessKeywords.test(candidateLine) &&
+      isValidMerchantCandidate(candidateLine) &&
+      !/^(Customer|Address|Contact|Doctor|Buyer|CustName):/i.test(candidateLine)
+    ) {
+      const cleaned = candidateLine.replace(/[^\w\s\.\&\-\/\(\)']/g, '').trim();
+      if (cleaned.length >= 3 && cleaned.length <= 65) {
+        supplierName = cleaned;
+        break;
+      }
+    }
+  }
+
+  // Strategy 2: Clean header lines from bounding-box sorted lines passing merchant validation
   if (!supplierName) {
-    for (const line of lines) {
-      if (
-        businessKeywords.test(line) &&
-        line.length <= 70 &&
-        !ignoredHeaderKeywords.test(line) &&
-        !/^(Customer|Address|Contact|Doctor|Buyer):/i.test(line) &&
-        !addressPatterns.test(line)
-      ) {
-        const cleaned = line.replace(/[^\w\s\.\&\-\/\(\)]/g, '').trim();
-        if (cleaned.length >= 3 && cleaned.length <= 65) {
+    for (const bLine of allPassSearchLines) {
+      if (isValidMerchantCandidate(bLine)) {
+        const cleaned = bLine.replace(/[^\w\s\.\&\-\/\(\)']/g, '').trim();
+        if (cleaned.length >= 3 && cleaned.length <= 60) {
           supplierName = cleaned;
           break;
         }
@@ -392,9 +442,8 @@ export function extractStructuredFinancialFields(mainText, footerText, gstinInfo
   // Strategy 3: Original top-8-lines fallback
   if (!supplierName) {
     for (let i = 0; i < Math.min(8, lines.length); i++) {
-      const l = lines[i].replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
-      if (l.length >= 3 && !ignoredHeaderKeywords.test(l) && !/^\d+$/.test(l)) {
-        supplierName = l;
+      if (isValidMerchantCandidate(lines[i])) {
+        supplierName = lines[i].replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
         break;
       }
     }
@@ -515,8 +564,8 @@ export function extractStructuredFinancialFields(mainText, footerText, gstinInfo
     /(?:grand\s*total|final\s*total|bill\s*total|bill\s*amount)[\s\:\=\-₹Rs.§X¥T#|]*\n?\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
     // 2. Explicit CASH or PAID line (like Hotel Roopali: CASH 224.00)
     /(?:^|\n)\s*cash[\s\:\=\-₹Rs\.]*\s*([0-9]+(?:\.[0-9]{1,2})?)/im,
-    // 3. Direct Total label anywhere on a line (handles OCR typos: totel, dotel, rotal, tota, wal;)
-    /(?<!sub[- ]|taxable\s*|gross\s*)\b(?:total|totel|dotel|tatal|tota|rotal|wal[;\:])[\s\:\=\-₹Rs.§X¥T#|]*\s*([0-9]+(?:\.[0-9]{1,2})?)/i,
+    // 3. Direct Total label anywhere on a line with flexible delimiter up to 25 chars (handles "Quantity: 390 Items: 9 Total : 2978.00")
+    /(?<!sub[- ]|taxable\s*|gross\s*)\b(?:total|totel|dotel|tatal|tota|rotal|wal)[^\d\n\r]{0,25}([0-9]+(?:\.[0-9]{1,2})?)/i,
   ];
 
   for (const pat of totalPatterns) {
@@ -690,7 +739,16 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
       },
     });
     pass2Text = p2.data?.text || '';
-    if (p2.data?.lines) combinedLines.push(...p2.data.lines);
+    if (p2.data?.lines) {
+      combinedLines.push(...p2.data.lines);
+      // Collect bounding-box sorted top lines from Pass 2 (shadow-removed OpenCV enhanced image)
+      const p2TopLines = [...p2.data.lines]
+        .filter(l => l.confidence > 20 && l.text && l.text.trim().length > 1)
+        .sort((a, b) => a.bbox.y0 - b.bbox.y0)
+        .slice(0, 15)
+        .map(l => l.text.trim());
+      topBBoxLines.unshift(...p2TopLines); // Prioritize enhanced lines at the front
+    }
   } catch (err) {
     console.warn('Pass 2 OCR warning:', err);
   }
@@ -730,13 +788,15 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
   // Extract GSTINs across the full combined text
   const gstinResult = extractAllGSTINs(fullDocumentText);
 
-  // Extract structured financial fields dynamically
+  // Extract structured financial fields dynamically across all passes
+  const allPassesCombined = `${primaryCleanText}\n${fullDocumentText}`;
   const structuredFields = extractStructuredFinancialFields(
-    primaryCleanText,
+    allPassesCombined,
     pass3FooterText,
     gstinResult,
     fileName,
-    topBBoxLines
+    topBBoxLines,
+    [pass1Text, pass2Text, pass3FooterText, fullDocumentText]
   );
 
   onProgress({ stage: 6, percent: 100, status: 'Complete! All bill sections extracted.' });
