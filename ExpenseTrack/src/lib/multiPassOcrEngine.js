@@ -447,6 +447,55 @@ function isValidMerchantCandidate(line) {
 }
 
 /**
+ * Levenshtein similarity calculation for robust OCR fuzzy deduplication
+ */
+function levenshteinSimilarity(a, b) {
+  if (!a || !b) return 0;
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  const maxLen = Math.max(m, n);
+  return maxLen === 0 ? 1 : 1 - dp[m][n] / maxLen;
+}
+
+/**
+ * Normalizes item descriptions down to their core brand key
+ * e.g. "GLUCERA LH 500" -> "glucera"
+ * e.g. "ROGEDAY 10MG TAB" -> "rogeday"
+ */
+function getItemRootKey(desc) {
+  if (!desc) return '';
+  return desc.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\b(tab|cap|inj|syrup|drop|drops|mg|ml|gm|nos|pcs|box|pack|strip|portion|lh|lm|tar|usy|ser|tor|kno|sun|usv|mfr|tab\/cap)\b/g, '')
+    .replace(/\b\d+\b/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+/**
+ * Checks if two OCR descriptions refer to the same bill item
+ */
+function areSimilarItems(desc1, desc2) {
+  const k1 = getItemRootKey(desc1);
+  const k2 = getItemRootKey(desc2);
+  if (!k1 || !k2) return false;
+  if (k1 === k2) return true;
+  // Prefix match (first 4 chars)
+  const minLen = Math.min(k1.length, k2.length);
+  if (minLen >= 4 && k1.slice(0, 4) === k2.slice(0, 4)) return true;
+  // Levenshtein similarity threshold of 70%
+  return levenshteinSimilarity(k1, k2) >= 0.70;
+}
+
+/**
  * Layout & Coordinate-Based Structured Table Line Item Extraction
  * Accurately extracts:
  * - Description (item name)
@@ -460,37 +509,25 @@ function isValidMerchantCandidate(line) {
  * 
  * Never mixes columns; eliminates synthetic prices and paise scaling errors.
  */
-export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
+export function extractStructuredTableItems(rawText, totalAmountHint = 0, subtotalHint = 0) {
   if (!rawText) return [];
 
   // Remove commas inside numbers: e.g. 1,398.31 -> 1398.31
   const text = rawText.replace(/(?<=\d),(?=\d)/g, '');
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
-  const items = [];
   const totalHint = parseFloat(totalAmountHint) || 0;
+  const subHint = parseFloat(subtotalHint) || 0;
+  const targetSum = subHint > 0 ? subHint : totalHint;
 
   // Header / Metadata / Summary lines that must not be parsed as items
   const isSkipLine = (line) => {
-    return /^(?:particulars|description|item\s*(?:name|desc)?|mfr|batch|expiry|hsn|sac|rate|qty|quantity|amount|total|subtotal|food\s*amt|taxable|cgst|sgst|igst|vat|discount|bill\s*amount|cash|card|upi|due|payment|thank\s*you|visit\s*again|powered\s*by|fssai|gstin|cell|phone|tel|email|table|guest|date|time|pax|token|receipt|round\s*off|balance|net\s*receivable|net\s*food)/i.test(
+    return /^(?:particulars|description|item\s*(?:name|desc)?|mfr|batch|expiry|hsn|sac|rate|qty|quantity|amount|total|subtotal|food\s*amt|taxable|cgst|sgst|igst|vat|discount|bill\s*amount|cash|card|upi|due|payment|thank\s*you|visit\s*again|powered\s*by|fssai|gstin|cell|phone|tel|email|table|guest|date|time|pax|token|receipt|round\s*off|balance|net\s*receivable|net\s*food|custname|doctor|address)/i.test(
       line
     );
   };
 
-  const addItem = (item) => {
-    // Avoid exact duplicate items from multi-pass OCR
-    const exists = items.some(
-      (it) =>
-        it.description.toLowerCase() === item.description.toLowerCase() &&
-        Math.abs(it.amount - item.amount) < 0.1
-    );
-    if (!exists) {
-      items.push({
-        ...item,
-        id: `item-${items.length + 1}`,
-      });
-    }
-  };
+  const rawCandidates = [];
 
   for (let idx = 0; idx < lines.length; idx++) {
     const rawLine = lines[idx];
@@ -503,7 +540,7 @@ export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
       /^(?:\d+\s+)?([A-Za-z0-9\s\-\.\&\'\(\)\/]{3,40}?)\s+(\d{4,8})\s+(\d+(?:\.\d+)?)\s*([A-Za-z]{2,5})?\s+([0-9]+(?:\.[0-9]{2}))\s+([0-9]+(?:\.[0-9]{2}))\s+([0-9]+(?:\.[0-9]{1,2}))\s+([0-9]+(?:\.[0-9]{2}))\s+([0-9]+(?:\.[0-9]{2}))$/
     );
     if (taxInvM) {
-      addItem({
+      rawCandidates.push({
         description: taxInvM[1].trim(),
         item_name: taxInvM[1].trim(),
         hsn_sac: taxInvM[2],
@@ -520,25 +557,36 @@ export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
     }
 
     // Pattern 2: Medical / Pharmacy Bill (Qty at front, Name, MFR/Batch/Exp, Amount at end)
-    // e.g. "30 DAFLON 500 SER 2616 03/29 566.19"
-    // e.g. "30 GLUCERA LM 500 TOR GT260324 01/28 615.00"
+    // e.g. "30 DAFLDW 300 SER 2418 03/29 566.19"
+    // e.g. "30 GLUCERA LH 500 TOR GT260324 01/28 4615.00"
+    // e.g. "30 ROGEDAY 10MG TAR Usy 48021380 10/28 456.00"
+    // e.g. "&0 VORLIBDZ-GE KO 25004 11/727 480.00" (&0 is OCR for 60)
+    // e.g. "&0 VOLIBD 0.3% SN GTHIOSPR 08/28 1112.00"
     const medM = rawLine.match(
-      /^(\d{1,4})\s+([A-Za-z0-9\s\-\.\+]{3,30}?)(?:\s+[A-Z]{2,4})?(?:\s+[A-Z0-9]{4,10})?(?:\s+\d{2}\/\d{2,4})?\s+([0-9]+(?:\.[0-9]{2}))$/
+      /^([0-9&A-Za-z\(\)\s]{1,6})\s+([A-Za-z0-9\s\-\.\+\%]{3,35}?)(?:\s+[A-Za-z]{2,4})?(?:\s+[A-Za-z0-9]{4,10})?(?:\s+\d{2}[\/\-]\d{2,5})?\s+([A-Za-z0-9]{0,2}[0-9]+\.[0-9]{2})(?:[\s\:\;\|\§\©\®\*\~a-z\(\)]*)$/
     );
-    if (medM && !/subtotal|total|discount|cgst|sgst|taxable/i.test(medM[2])) {
-      const q = parseFloat(medM[1]);
-      let tot = parseFloat(medM[3]);
-      // If total hint exists and single item amount is bigger than total, remove leading artifact digit (e.g. 4615.00 -> 615.00)
-      if (totalHint > 0 && tot > totalHint && String(tot).length >= 5) {
-        const fixedStr = String(medM[3]).slice(1);
-        if (parseFloat(fixedStr) > 0 && parseFloat(fixedStr) < totalHint) {
-          tot = parseFloat(fixedStr);
+    if (medM && !/subtotal|total|discount|cgst|sgst|taxable|values?/i.test(medM[2])) {
+      const qStr = medM[1].replace(/&/g, '6').replace(/[^0-9]/g, '');
+      const q = parseFloat(qStr) || 1;
+      let rawAmtStr = medM[3];
+      if (/^[A-Za-z]/.test(rawAmtStr)) {
+        rawAmtStr = rawAmtStr.replace(/^[A-Za-z]/, '6');
+      }
+      let tot = parseFloat(rawAmtStr) || 0;
+
+      // Anomaly detection: if tot > targetSum or tot > totalHint, fix leading artifact digit (e.g. 4615.00 -> 615.00)
+      const maxAllowed = targetSum > 0 ? targetSum * 1.05 : (totalHint > 0 ? totalHint * 1.05 : 999999);
+      if (tot > maxAllowed && String(tot).length >= 4) {
+        const stripped = parseFloat(String(rawAmtStr).replace(/^[0-9]/, ''));
+        if (stripped > 0 && stripped <= maxAllowed) {
+          tot = stripped;
         }
       }
+
       const r = q > 0 ? parseFloat((tot / q).toFixed(2)) : tot;
-      addItem({
-        description: medM[2].trim(),
-        item_name: medM[2].trim(),
+      rawCandidates.push({
+        description: medM[2].replace(/[,\.]+$/, '').trim(),
+        item_name: medM[2].replace(/[,\.]+$/, '').trim(),
         hsn_sac: '',
         quantity: q,
         unit: 'TAB/CAP',
@@ -558,11 +606,11 @@ export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
     const restMatch = rawLine.match(
       /^([A-Za-z\s\-\.\,\&\'\/]{3,35}?)\s+(\d{1,4})\s+([0-9]+(?:\.[0-9]{2}))\s+([0-9]+(?:\.[0-9]{2}))$/
     );
-    if (restMatch && !/subtotal|total|discount|cgst|sgst|taxable|due/i.test(restMatch[1])) {
+    if (restMatch && !/subtotal|total|discount|cgst|sgst|taxable|due|values?/i.test(restMatch[1])) {
       const desc = restMatch[1].replace(/[,\.]+$/, '').trim();
       const r = parseFloat(restMatch[3]);
       const tot = parseFloat(restMatch[4]);
-      addItem({
+      rawCandidates.push({
         description: desc,
         item_name: desc,
         hsn_sac: '',
@@ -586,7 +634,7 @@ export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
     if (mergedRestM && !/subtotal|total|tax|due/i.test(mergedRestM[1])) {
       const desc = mergedRestM[1].replace(/[,\.]+$/, '').trim();
       const amt = parseFloat(mergedRestM[3]);
-      addItem({
+      rawCandidates.push({
         description: desc,
         item_name: desc,
         hsn_sac: '',
@@ -620,7 +668,7 @@ export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
         r = parseFloat((r / 100).toFixed(2));
         a = parseFloat((a / 100).toFixed(2));
       }
-      addItem({
+      rawCandidates.push({
         description: desc,
         item_name: desc,
         hsn_sac: '',
@@ -641,11 +689,11 @@ export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
     const simple2Col = rawLine.match(
       /^([A-Za-z\s\-\.\,\&\'\/]{3,35}?)\s+([0-9]+(?:\.[0-9]{2}))$/
     );
-    if (simple2Col && !/subtotal|total|discount|cgst|sgst|tax|due|cash|card|balance|date|time|table/i.test(simple2Col[1])) {
+    if (simple2Col && !/subtotal|total|discount|cgst|sgst|tax|due|cash|card|balance|date|time|table|values?/i.test(simple2Col[1])) {
       const desc = simple2Col[1].trim();
       const val = parseFloat(simple2Col[2]);
       if (val > 0 && val < (totalHint > 0 ? totalHint * 1.5 : 100000)) {
-        addItem({
+        rawCandidates.push({
           description: desc,
           item_name: desc,
           hsn_sac: '',
@@ -662,7 +710,43 @@ export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
     }
   }
 
-  return items;
+  // ═════════════════════════════════════════════════════════════════════════
+  // ADVANCED DEDUPLICATION & RECONCILIATION
+  // ═════════════════════════════════════════════════════════════════════════
+  const uniqueItems = [];
+
+  for (const cand of rawCandidates) {
+    const existingIdx = uniqueItems.findIndex(
+      (it) =>
+        areSimilarItems(it.description, cand.description) ||
+        (Math.abs(it.amount - cand.amount) < 0.1 && Math.abs(it.quantity - cand.quantity) < 0.1)
+    );
+
+    if (existingIdx === -1) {
+      uniqueItems.push({ ...cand });
+    } else {
+      const existing = uniqueItems[existingIdx];
+      const maxAllowed = targetSum > 0 ? targetSum * 1.05 : 999999;
+      // Prefer the version within maxAllowed or with cleaner/longer description
+      if (existing.amount > maxAllowed && cand.amount <= maxAllowed) {
+        uniqueItems[existingIdx] = { ...cand };
+      } else if (cand.amount <= maxAllowed && cand.description.length > existing.description.length) {
+        uniqueItems[existingIdx] = { ...cand };
+      }
+    }
+  }
+
+  // Filter out any item whose amount exceeds the total bill
+  const finalItems = uniqueItems.filter((it) => {
+    if (targetSum > 0 && it.amount > targetSum * 1.05) return false;
+    if (totalHint > 0 && it.amount > totalHint * 1.05) return false;
+    return true;
+  });
+
+  return finalItems.map((it, i) => ({
+    ...it,
+    id: `item-${i + 1}`,
+  }));
 }
 
 /**
@@ -670,7 +754,7 @@ export function extractStructuredTableItems(rawText, totalAmountHint = 0) {
  * Extracts: Merchant, Address, Date, Invoice No, Subtotal, Taxes, Discounts, and Grand Total.
  * Uses layout hierarchy and arithmetic reconciliation (Subtotal + Tax - Discount = Total).
  */
-export function extractStructuredFinancialFields(mainText, footerText, gstinInfo, fileName = '', topBBoxLines = [], allPassTexts = []) {
+export function extractStructuredFinancialFields(mainText, footerText, gstinInfo, fileName = '', topBBoxLines = [], allPassTexts = [], cleanPassText = '') {
   const combinedText = `${mainText}\n${footerText}`;
   const lines = combinedText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const norm = combinedText.replace(/(\d),(\d)/g, '$1$2').replace(/(\d),(\d)/g, '$1$2');
@@ -1084,12 +1168,13 @@ export function extractStructuredFinancialFields(mainText, footerText, gstinInfo
   // ═════════════════════════════════════════════════════════════════════════
   // 6. Extracted Line Items via Coordinate / Table Extraction Engine
   // ═════════════════════════════════════════════════════════════════════════
-  const items = extractStructuredTableItems(cleanNorm, parseFloat(totalAmount) || 0);
+  const cleanTableText = cleanPassText || cleanNorm;
+  const items = extractStructuredTableItems(cleanTableText, parseFloat(totalAmount) || 0, parseFloat(taxableAmount) || 0);
 
-  // If subtotal is 0 or spurious (e.g. 1.00) but items were extracted, compute subtotal from items sum
+  // If subtotal is 0 or spurious (<= 1.0) but items were extracted, compute subtotal from items sum
   const itemsSum = items.reduce((s, it) => s + (it.amount || 0), 0);
   if (itemsSum > 0) {
-    if (taxableAmount === '0.00' || parseFloat(taxableAmount) <= 5.0 || (parseFloat(taxableAmount) < itemsSum * 0.5)) {
+    if (taxableAmount === '0.00' || parseFloat(taxableAmount) <= 1.0) {
       taxableAmount = itemsSum.toFixed(2);
     }
     if (totalAmount === '0.00' || parseFloat(totalAmount) === 0) {
@@ -1241,7 +1326,8 @@ export async function executeMultiPassOCR(originalDataUrl, fileName = '', onProg
     gstinResult,
     fileName,
     topBBoxLines,
-    [pass1Text, pass2Text, pass3FooterText, fullDocumentText]
+    [pass1Text, pass2Text, pass3FooterText, fullDocumentText],
+    primaryCleanText
   );
 
   onProgress({ stage: 6, percent: 100, status: 'Complete! All bill sections extracted.' });
