@@ -57,6 +57,20 @@ async function runBenchmark() {
       expMerchant: 'Southern Railway',
       expGSTIN: '33AAAGM0239C1ZQ',
       expTotal: '170.00'
+    },
+    {
+      id: 'The Lake Hill (Restaurant)',
+      file: './data/bills/printed/demo printed bills/d14.jfif',
+      expMerchant: 'The Lake Hill',
+      expGSTIN: '05AEBFS0701F1ZP',
+      expTotal: '1650.00'
+    },
+    {
+      id: 'Classik Family Restaurant',
+      file: './data/bills/printed/demo printed bills/d13.jfif',
+      expMerchant: 'Classik Family Restaurant',
+      expGSTIN: '27AAGFH4645G2ZB',
+      expTotal: '165.00'
     }
   ];
 

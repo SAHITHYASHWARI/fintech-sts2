@@ -356,6 +356,12 @@ const VERIFIED_ENTERPRISE_REGISTRY = {
     address: 'Katpadi, Vellore - 632007, Tamil Nadu',
     category: 'Shopping & Electronics',
   },
+  '24AAGFG1234F1Z5': {
+    tradeName: 'Gujarat Freight Tools',
+    legalName: 'Gujarat Freight Tools Private Limited',
+    address: 'Surat, Gujarat',
+    category: 'Shopping & Electronics',
+  },
   '33AAAGM0289C1ZQ': {
     tradeName: 'Indian Railways',
     legalName: 'Ministry of Railways (Southern Railway)',
@@ -375,6 +381,12 @@ function formatGrammaticalMerchant(rawName) {
   str = str.replace(/^RAMRAJ$/i, 'Ramraj Cotton');
   str = str.replace(/KATPADI\s*KITCHEN/i, 'Katpadi Kitchen');
   str = str.replace(/INDIAN\s*RAILWAYS/i, 'Indian Railways');
+  str = str.replace(/THE\s*LAKE\s*HILL/i, 'The Lake Hill');
+  str = str.replace(/CLASSIK\s*FAMILY\s*RESTURANT/i, 'Classik Family Restaurant');
+  str = str.replace(/^CLASSIK$/i, 'Classik Family Restaurant');
+  str = str.replace(/GUJARAT\s*FREIGHT/i, 'Gujarat Freight Tools');
+  str = str.replace(/HOTEL\s*ANAND\s*REGENCY/i, 'Hotel Anand Regency');
+  str = str.replace(/SLEEK\s*BILL/i, 'Sleek Bill');
   str = str.replace(/SRI\s*MURUGAN\s*TRAD\s*EAS?\s*SEAR?/i, 'Sri Murugan Traders');
   str = str.replace(/SRI\s*MURUGAN\s*TRADERS?/i, 'Sri Murugan Traders');
 
@@ -2295,12 +2307,12 @@ export default function BillsAndRemindersView({ currentUser }) {
           {/* Ingestion & Autofill 2-Column Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
             {/* Left: Dropzone & Image Preview */}
-            <div className="lg:col-span-5 space-y-4">
+            <div className="lg:col-span-5 min-w-0 space-y-4">
               {/* Google Lens Smart Viewfinder & Scanner */}
               {receiptPreviewUrl ? (
                 <div className="rounded-3xl border border-cyan-500/40 bg-[#070e1b] p-4 space-y-3.5 shadow-[0_12px_40px_rgba(6,182,212,0.18)]">
                   {/* Top Bar with Lens Brand, Image Toggle Tabs & Zoom/Rotate Controls */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                     <div className="flex items-center space-x-2">
                       <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 via-teal-400 to-emerald-400 flex items-center justify-center shadow-[0_0_10px_#06b6d4]">
                         <Camera className="w-3.5 h-3.5 text-slate-950 font-black" />
@@ -2339,7 +2351,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                       </button>
                     </div>
 
-                    <div className="flex items-center space-x-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {/* Zoom Out */}
                       <button
                         type="button"
@@ -2371,7 +2383,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="px-2.5 py-1.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-400 text-xs transition cursor-pointer font-bold"
+                        className="px-2.5 py-1.5 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-400 text-xs transition cursor-pointer font-bold whitespace-nowrap"
                         title="Re-upload different bill"
                       >
                         Re-upload
@@ -2541,11 +2553,11 @@ export default function BillsAndRemindersView({ currentUser }) {
             </div>
 
             {/* Right: Extracted Fields Form (Autofill) */}
-            <div className="lg:col-span-7 space-y-4">
+            <div className="lg:col-span-7 min-w-0 space-y-4">
               <div className="p-5 sm:p-6 rounded-3xl bg-[#070e1b]/95 backdrop-blur-xl border border-cyan-500/40 shadow-[0_12px_40px_rgba(6,182,212,0.18)] space-y-4">
-                <div className="flex items-center justify-between pb-3.5 border-b border-cyan-500/20">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-5 h-5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3.5 border-b border-cyan-500/20">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="w-5 h-5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center flex-shrink-0">
                       <FileText className="w-3.5 h-3.5 text-cyan-400" />
                     </div>
                     <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-100 flex items-center space-x-2">
@@ -2833,98 +2845,159 @@ export default function BillsAndRemindersView({ currentUser }) {
                   </div>
                 </div>
 
-                {/* 8. Extracted Line Items Table (Requirement 2 & 5) */}
-                <div className="pt-2 border-t border-cyan-500/20 space-y-2">
-                  <div className="flex items-center justify-between">
+                {/* 8. Extracted Line Items Table (Structured Table Extraction Engine) */}
+                <div className="pt-2 border-t border-cyan-500/20 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center text-cyan-400">
                       <Receipt className="w-3.5 h-3.5 mr-1.5 text-cyan-400" />
-                      Extracted Line Items ({ocrLineItems.length})
+                      Structured Line Items ({ocrLineItems.length})
                     </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOcrLineItems([
-                          ...ocrLineItems,
-                          { item_name: 'Custom Item', quantity: 1, unit_price: 0, total: 0 },
-                        ])
-                      }
-                      className="text-[10px] font-bold text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900 px-2 py-0.5 rounded-lg border border-cyan-500/30 cursor-pointer transition"
-                    >
-                      + Add Item
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newItem = {
+                            id: `item-${ocrLineItems.length + 1}`,
+                            description: 'Item ' + (ocrLineItems.length + 1),
+                            item_name: 'Item ' + (ocrLineItems.length + 1),
+                            hsn_sac: '',
+                            quantity: 1,
+                            unit: 'NOS',
+                            rate: 0,
+                            unit_price: 0,
+                            tax_percent: 0,
+                            tax_amount: 0,
+                            amount: 0,
+                            total: 0,
+                          };
+                          setOcrLineItems([...ocrLineItems, newItem]);
+                        }}
+                        className="text-[10px] font-bold text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900 px-2.5 py-1 rounded-lg border border-cyan-500/30 cursor-pointer transition flex items-center space-x-1"
+                      >
+                        <span>+ Add Item</span>
+                      </button>
+                    </div>
                   </div>
 
                   {ocrLineItems.length > 0 ? (
-                    <div className="overflow-x-auto max-h-44 overflow-y-auto rounded-xl border border-cyan-500/20 bg-[#060a14]">
-                      <table className="w-full text-[11px] text-left">
-                        <thead className="bg-slate-900/90 text-slate-400 text-[10px] uppercase font-bold sticky top-0">
-                          <tr>
-                            <th className="px-2.5 py-1.5">Description</th>
-                            <th className="px-1.5 py-1.5 text-center w-12">Qty</th>
-                            <th className="px-2 py-1.5 text-right w-16">Rate (₹)</th>
-                            <th className="px-2 py-1.5 text-right w-16">Total (₹)</th>
-                            <th className="px-1 py-1.5 text-center w-8"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800 text-slate-200">
-                          {ocrLineItems.map((item, idx) => (
-                            <tr key={idx} className="hover:bg-cyan-950/20">
-                              <td className="px-2 py-1">
-                                <input
-                                  type="text"
-                                  value={item.item_name || ''}
-                                  onChange={(e) => {
-                                    const next = [...ocrLineItems];
-                                    next[idx].item_name = e.target.value;
-                                    setOcrLineItems(next);
-                                  }}
-                                  className="w-full bg-transparent border-none text-[11px] font-medium text-slate-100 focus:outline-none"
-                                />
-                              </td>
-                              <td className="px-1 py-1 text-center">
-                                <input
-                                  type="number"
-                                  value={item.quantity || 1}
-                                  onChange={(e) => {
-                                    const next = [...ocrLineItems];
-                                    const q = parseFloat(e.target.value) || 0;
-                                    next[idx].quantity = q;
-                                    next[idx].total = q * (next[idx].unit_price || 0);
-                                    setOcrLineItems(next);
-                                  }}
-                                  className="w-10 bg-transparent text-center border-none text-[11px] text-slate-300 focus:outline-none"
-                                />
-                              </td>
-                              <td className="px-2 py-1 text-right">
-                                <input
-                                  type="number"
-                                  value={item.unit_price || 0}
-                                  onChange={(e) => {
-                                    const next = [...ocrLineItems];
-                                    const r = parseFloat(e.target.value) || 0;
-                                    next[idx].unit_price = r;
-                                    next[idx].total = (next[idx].quantity || 1) * r;
-                                    setOcrLineItems(next);
-                                  }}
-                                  className="w-14 bg-transparent text-right border-none text-[11px] text-slate-300 focus:outline-none"
-                                />
-                              </td>
-                              <td className="px-2 py-1 text-right font-mono font-bold text-emerald-400">
-                                ₹{(item.total || 0).toFixed(2)}
-                              </td>
-                              <td className="px-1 py-1 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setOcrLineItems(ocrLineItems.filter((_, i) => i !== idx))}
-                                  className="text-slate-500 hover:text-rose-400 p-0.5"
-                                >
-                                  ×
-                                </button>
-                              </td>
+                    <div className="space-y-2">
+                      <div className="overflow-x-auto max-h-52 overflow-y-auto rounded-xl border border-cyan-500/20 bg-[#060a14] scrollbar-thin">
+                        <table className="w-full text-[11px] text-left border-collapse">
+                          <thead className="bg-slate-900/95 text-slate-400 text-[10px] uppercase font-bold sticky top-0 border-b border-slate-800">
+                            <tr>
+                              <th className="px-2.5 py-2">#</th>
+                              <th className="px-2.5 py-2">Item Description</th>
+                              <th className="px-1.5 py-2 text-center w-14">Qty</th>
+                              <th className="px-1.5 py-2 text-center w-14">Unit</th>
+                              <th className="px-2 py-2 text-right w-20">Rate (₹)</th>
+                              <th className="px-2.5 py-2 text-right w-24">Amount (₹)</th>
+                              <th className="px-1.5 py-2 text-center w-8"></th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/70 text-slate-200">
+                            {ocrLineItems.map((item, idx) => {
+                              const desc = item.description || item.item_name || '';
+                              const qty = item.quantity ?? 1;
+                              const rate = item.rate ?? item.unit_price ?? 0;
+                              const amt = item.amount ?? item.total ?? 0;
+                              const unit = item.unit || 'NOS';
+                              return (
+                                <tr key={item.id || idx} className="hover:bg-cyan-950/25 transition">
+                                  <td className="px-2.5 py-1.5 text-slate-500 font-mono text-[10px]">
+                                    {idx + 1}
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      type="text"
+                                      value={desc}
+                                      onChange={(e) => {
+                                        const next = [...ocrLineItems];
+                                        next[idx].description = e.target.value;
+                                        next[idx].item_name = e.target.value;
+                                        setOcrLineItems(next);
+                                      }}
+                                      placeholder="Item name"
+                                      className="w-full bg-transparent border-none text-[11px] font-medium text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 rounded px-1"
+                                    />
+                                  </td>
+                                  <td className="px-1.5 py-1 text-center">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={qty}
+                                      onChange={(e) => {
+                                        const next = [...ocrLineItems];
+                                        const q = parseFloat(e.target.value) || 0;
+                                        next[idx].quantity = q;
+                                        const r = next[idx].rate ?? next[idx].unit_price ?? 0;
+                                        const computed = parseFloat((q * r).toFixed(2));
+                                        next[idx].amount = computed;
+                                        next[idx].total = computed;
+                                        setOcrLineItems(next);
+                                      }}
+                                      className="w-12 bg-slate-900/60 border border-slate-700/60 rounded text-center text-[11px] text-slate-200 focus:outline-none focus:border-cyan-400 py-0.5"
+                                    />
+                                  </td>
+                                  <td className="px-1.5 py-1 text-center">
+                                    <input
+                                      type="text"
+                                      value={unit}
+                                      onChange={(e) => {
+                                        const next = [...ocrLineItems];
+                                        next[idx].unit = e.target.value;
+                                        setOcrLineItems(next);
+                                      }}
+                                      className="w-14 bg-slate-900/60 border border-slate-700/60 rounded text-center text-[10px] text-slate-400 focus:outline-none focus:border-cyan-400 py-0.5 uppercase"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1 text-right">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={rate}
+                                      onChange={(e) => {
+                                        const next = [...ocrLineItems];
+                                        const r = parseFloat(e.target.value) || 0;
+                                        next[idx].rate = r;
+                                        next[idx].unit_price = r;
+                                        const q = next[idx].quantity ?? 1;
+                                        const computed = parseFloat((q * r).toFixed(2));
+                                        next[idx].amount = computed;
+                                        next[idx].total = computed;
+                                        setOcrLineItems(next);
+                                      }}
+                                      className="w-16 bg-slate-900/60 border border-slate-700/60 rounded text-right text-[11px] text-slate-200 focus:outline-none focus:border-cyan-400 py-0.5 px-1"
+                                    />
+                                  </td>
+                                  <td className="px-2.5 py-1 text-right font-mono font-bold text-cyan-300">
+                                    ₹{amt.toFixed(2)}
+                                  </td>
+                                  <td className="px-1 py-1 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => setOcrLineItems(ocrLineItems.filter((_, i) => i !== idx))}
+                                      className="text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 p-1 rounded transition"
+                                      title="Delete line item"
+                                    >
+                                      ×
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Line Items Real-time Total & Discrepancy Bar */}
+                      <div className="flex flex-wrap items-center justify-between text-[11px] px-2 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400">
+                        <span>Items Sum: <strong className="text-cyan-300 font-mono">₹{ocrLineItems.reduce((s, it) => s + (it.amount ?? it.total ?? 0), 0).toFixed(2)}</strong></span>
+                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/30">
+                          {Math.abs(ocrLineItems.reduce((s, it) => s + (it.amount ?? it.total ?? 0), 0) - (parseFloat(ocrSubtotal) || 0)) <= 1.0
+                            ? '✓ Matches Subtotal'
+                            : `Taxable: ₹${ocrSubtotal || '0.00'}`}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-[10px] text-slate-500 italic">No line items parsed yet. Full total recorded above.</p>
