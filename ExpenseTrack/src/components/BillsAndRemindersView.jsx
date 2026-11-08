@@ -212,6 +212,14 @@ function normalizeGSTINCandidate(raw) {
 }
 
 const VERIFIED_ENTERPRISE_REGISTRY = {
+  '29AABASE151M1ZP': {
+    tradeName: 'Hotel Anand Regency',
+    legalName: 'Hotel Anand Regency',
+    address: 'S.D. Plaza, Bangalore, Karnataka',
+    status: 'Active',
+    verified: true,
+    category: 'Hotel & Lodging',
+  },
   '29AADCL1443Q1Z2': {
     tradeName: 'Hotel Dhruvathare',
     legalName: 'Hotel Dhruvathare (Vegetarian Restaurant)',
