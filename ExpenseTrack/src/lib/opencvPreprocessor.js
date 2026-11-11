@@ -100,31 +100,16 @@ export async function processBillImageOpenCV(dataUrl) {
   let origW = img.naturalWidth || img.width || 1600;
   let origH = img.naturalHeight || img.height || 2200;
 
-  // Step 1: Detect Document Bounds and Auto-Crop away table background
+  // Step 1: Preserve 100% Full Document Canvas (Never crop off header or footer!)
   let workingCanvas = document.createElement('canvas');
   workingCanvas.width = origW;
   workingCanvas.height = origH;
   let wCtx = workingCanvas.getContext('2d', { willReadFrequently: true });
   if (wCtx) {
     wCtx.drawImage(img, 0, 0, origW, origH);
-    const initialImgData = wCtx.getImageData(0, 0, origW, origH);
-    const bounds = detectDocumentBounds(initialImgData, origW, origH);
-
-    if (bounds) {
-      const croppedCanvas = document.createElement('canvas');
-      croppedCanvas.width = bounds.cropW;
-      croppedCanvas.height = bounds.cropH;
-      const cCtx = croppedCanvas.getContext('2d');
-      if (cCtx) {
-        cCtx.drawImage(workingCanvas, bounds.minX, bounds.minY, bounds.cropW, bounds.cropH, 0, 0, bounds.cropW, bounds.cropH);
-        workingCanvas = croppedCanvas;
-        origW = bounds.cropW;
-        origH = bounds.cropH;
-      }
-    }
   }
 
-  // Step 2: Standardize scale for optimal OCR DPI (target width between 2000px and 2600px)
+  // Step 2: Standardize scale for optimal OCR DPI (target width between 2200px and 2800px)
   let scale = 1.0;
   const maxDim = Math.max(origW, origH);
   if (maxDim < 2200) {
@@ -253,9 +238,9 @@ export async function processBillImageOpenCV(dataUrl) {
   }
   const thresholdUrl = threshCanvas.toDataURL('image/jpeg', 0.90);
 
-  // Step 7: Pass 3 Image: High-Resolution Bottom / Footer 48% Section Crop
+  // Step 7: Pass 3 Image: High-Resolution Bottom / Footer 55% Section Crop
   const footerCropCanvas = document.createElement('canvas');
-  const cropStartY = Math.floor(h * 0.52);
+  const cropStartY = Math.floor(h * 0.45);
   const cropH = h - cropStartY;
   footerCropCanvas.width = w;
   footerCropCanvas.height = cropH;

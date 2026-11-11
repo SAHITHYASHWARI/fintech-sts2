@@ -1,0 +1,463 @@
+{
+  "05_arunai_medicals_bill_2_clear.jpg": {
+    "category": "Health & Medical",
+    "merchant": "Arunai Medicals",
+    "gstin": "33CMOPS3767A1ZV",
+    "customer_gstin": null,
+    "date": "2026-09-01",
+    "invoice_ref": "C01016486",
+    "subtotal": 3239.19,
+    "discount": 485.88,
+    "tax": 0,
+    "total": 2753,
+    "address": "No. 92/1, Katchery Street, Tirupattur - 635601",
+    "items_count": 5,
+    "items": [
+      {
+        "description": "DAFLON 500",
+        "qty": 30,
+        "rate": 18.87,
+        "amount": 566.19
+      },
+      {
+        "description": "GLUCERA LM 500",
+        "qty": 30,
+        "rate": 20.5,
+        "amount": 615
+      },
+      {
+        "description": "ROSEDAY 10MG TAB",
+        "qty": 30,
+        "rate": 15.53,
+        "amount": 466
+      },
+      {
+        "description": "VOGLIBOZ-GM2",
+        "qty": 60,
+        "rate": 8,
+        "amount": 480
+      },
+      {
+        "description": "VOLIBO 0.3MG",
+        "qty": 60,
+        "rate": 18.53,
+        "amount": 1112
+      }
+    ]
+  },
+  "06_arunai_medicals_bill_3_clear.jpg": {
+    "category": "Health & Medical",
+    "merchant": "Arunai Medicals",
+    "gstin": "33CMOPS3767A1ZV",
+    "customer_gstin": null,
+    "date": "2026-10-21",
+    "invoice_ref": "C01022082",
+    "subtotal": 3325.8,
+    "discount": 498.87,
+    "tax": 0,
+    "total": 2827,
+    "address": "No. 92/1, Katchery Street, Tirupattur - 635601",
+    "items_count": 5,
+    "items": [
+      {
+        "description": "DAFLON 500",
+        "qty": 30,
+        "rate": 20.76,
+        "amount": 622.8
+      },
+      {
+        "description": "GLUCRETA LM 500",
+        "qty": 30,
+        "rate": 20.5,
+        "amount": 615
+      },
+      {
+        "description": "ROSEDAY 10MG TAB",
+        "qty": 30,
+        "rate": 15.53,
+        "amount": 466
+      },
+      {
+        "description": "VOGLIBOZ-GM2",
+        "qty": 60,
+        "rate": 8.5,
+        "amount": 510
+      },
+      {
+        "description": "VOLIBO 0.3MG",
+        "qty": 60,
+        "rate": 18.53,
+        "amount": 1112
+      }
+    ]
+  },
+  "03_arunai_medicals_bill_1_clear.jpg": {
+    "category": "Health & Medical",
+    "merchant": "Arunai Medicals",
+    "gstin": "33CMOPS3767A1ZV",
+    "customer_gstin": null,
+    "date": "2026-01-05",
+    "invoice_ref": "C01030532",
+    "subtotal": 3503.75,
+    "discount": 525.56,
+    "tax": 0,
+    "total": 2978,
+    "address": "No. 92/1, Katchery Street, Tirupattur - 635601",
+    "items_count": 11
+  },
+  "02_masha_pharmacy_clear.jpg": {
+    "category": "Health & Medical",
+    "merchant": "Masha Pharmacy",
+    "gstin": "33ACEFM3457F1ZE",
+    "customer_gstin": null,
+    "date": "2026-08-15",
+    "invoice_ref": "MASHA-10603",
+    "subtotal": 400.01,
+    "tax": 16.76,
+    "discount": 0,
+    "total": 417,
+    "address": "50, Vallimalai Road, Katpadi, Vellore - 632007",
+    "items_count": 9
+  },
+  "04_ramraj_cotton_clear.jpg": {
+    "category": "Clothing & Apparel",
+    "merchant": "Ramraj Cotton",
+    "gstin": "33AAHFR2641F1ZI",
+    "customer_gstin": null,
+    "date": "2026-11-01",
+    "invoice_ref": "R220/CC8678",
+    "subtotal": 1000.04,
+    "tax": 50,
+    "discount": 0,
+    "total": 1050.05,
+    "address": "Chittoor Bus Stand, Katpadi - 632007",
+    "items_count": 4
+  },
+  "07_katpadi_kitchen_clear.jpg": {
+    "category": "Dining & Restaurant",
+    "merchant": "Katpadi Kitchen",
+    "gstin": null,
+    "customer_gstin": null,
+    "date": "2026-10-29",
+    "invoice_ref": "KOT-6",
+    "subtotal": 510,
+    "tax": 0,
+    "discount": 0,
+    "total": 510,
+    "address": "Opp VIT Main Gate, Vellakalmedu, Katpadi",
+    "items_count": 6
+  },
+  "08_indian_railways_ticket_clear.jpg": {
+    "category": "Travel & Transit",
+    "merchant": "Southern Railway (Indian Railways)",
+    "gstin": "33AAAGM0239C1ZQ",
+    "customer_gstin": null,
+    "date": "2026-09-18",
+    "invoice_ref": "CXRPEGG1IGE",
+    "subtotal": 170,
+    "tax": 0,
+    "discount": 0,
+    "total": 170,
+    "address": "Salem Jn to Katpadi Jn"
+  },
+  "01_handwritten_electronics_clear.jpg": {
+    "category": "Shopping & Electronics",
+    "merchant": "Godrej & Premier Appliances",
+    "gstin": null,
+    "customer_gstin": null,
+    "date": "2025-10-08",
+    "invoice_ref": null,
+    "subtotal": 23200,
+    "tax": 0,
+    "discount": 0,
+    "total": 23200,
+    "address": "Katpadi, Vellore - 632007"
+  },
+  "d1.jfif": {
+    "merchant": "Retail Store",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "faded_thermal",
+    "unreadable": true
+  },
+  "d11.png": {
+    "merchant": "Sleek Bill",
+    "gstin": "27AAFCV2419G1ZT",
+    "date": "2025-01-23",
+    "invoice_ref": "IN-15",
+    "total": 1068,
+    "items": [
+      {
+        "name": "Orange Powder",
+        "qty": 1,
+        "price": 400
+      }
+    ]
+  },
+  "d12.jfif": {
+    "merchant": "JRLGHN DOLL SCP",
+    "gstin": null,
+    "date": "2017-07-01",
+    "total": 25,
+    "items": [
+      {
+        "name": "Coffee",
+        "qty": 1,
+        "price": 25
+      }
+    ]
+  },
+  "d13.jfif": {
+    "merchant": "Classik Family Restaurant",
+    "gstin": "27AAGFH4645G2ZB",
+    "date": "2017-11-05",
+    "invoice_ref": null,
+    "total": 165
+  },
+  "d14.jfif": {
+    "merchant": "The Lake Hill",
+    "gstin": "05AEBFS0701F1ZP",
+    "date": "2024-08-16",
+    "invoice_ref": null,
+    "total": 1650,
+    "address": "Near main boat stand, Bhimtal, Uttarakhand 263136"
+  },
+  "d15.png": {
+    "merchant": "Restaurant Bill",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "blank_template",
+    "unreadable": true
+  },
+  "d16.jfif": {
+    "merchant": "GST Tax Invoice Format",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "blank_template",
+    "unreadable": true
+  },
+  "d17.jfif": {
+    "merchant": "Hotel Food Paradise",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "faded_thermal",
+    "unreadable": true
+  },
+  "d18.jfif": {
+    "merchant": "Hotel Saravana Bhavan",
+    "gstin": null,
+    "date": null,
+    "total": 50,
+    "address": "Vadapalani, Chennai - 600026"
+  },
+  "d19.jfif": {
+    "merchant": "Odisha Hotel",
+    "gstin": "21FZPPS1850H1Z4",
+    "date": "2022-04-15",
+    "invoice_ref": "2760",
+    "total": 777,
+    "address": "F-19, Chandrasekharpur, Bhubaneshwar - 751024"
+  },
+  "d2.png": {
+    "merchant": "Hotel Hira Panna",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "faded_thermal",
+    "unreadable": true
+  },
+  "d20.jfif": {
+    "merchant": "The Lake Hill",
+    "gstin": "05AEBFS0701F1ZP",
+    "date": "2024-08-16",
+    "invoice_ref": null,
+    "total": 1650,
+    "address": "Bhimtal, Uttarakhand 263136"
+  },
+  "d21.jfif": {
+    "merchant": "Narroff Restaurant",
+    "gstin": null,
+    "date": null,
+    "invoice_ref": "185476",
+    "total": null,
+    "status": "faded_thermal",
+    "unreadable": true
+  },
+  "d22.jfif": {
+    "merchant": "Hotel Roofali",
+    "gstin": "27ADNPS1534J1ZF",
+    "date": "2017-07-01",
+    "invoice_ref": "944",
+    "total": 224,
+    "address": "Shivaji Nagar, F.C. Road, Pune"
+  },
+  "d23.jfif": {
+    "merchant": "Jungle View",
+    "gstin": null,
+    "date": null,
+    "total": 80
+  },
+  "d24.jfif": {
+    "merchant": "Retail Store",
+    "gstin": null,
+    "date": null,
+    "total": 240
+  },
+  "d25.jfif": {
+    "merchant": "Indish The Veg Treat",
+    "gstin": null,
+    "date": "2017-08-18",
+    "total": 140,
+    "address": "Kharadi Magarpatta Road, Pune 411014"
+  },
+  "d26.jfif": {
+    "merchant": "Refrens Internet Pvt. Ltd.",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "faded_sample",
+    "unreadable": true
+  },
+  "d27.jfif": {
+    "merchant": "Hotel Invoice Format",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "blank_template",
+    "unreadable": true
+  },
+  "d28.jfif": {
+    "merchant": "Retail Beverage Limited",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "address": "12th Road, Bangalore"
+  },
+  "d29.jfif": {
+    "merchant": "Bar & Lounge",
+    "gstin": null,
+    "date": "2020-08-08",
+    "invoice_ref": "ABSI5",
+    "total": 2580
+  },
+  "d3.jfif": {
+    "merchant": "Plaza Restaurant",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "faded_thermal",
+    "unreadable": true
+  },
+  "d30.jfif": {
+    "merchant": "Hotel Roofali",
+    "gstin": "27ADNPS1534J1ZF",
+    "date": "2017-07-01",
+    "invoice_ref": "944",
+    "total": 224,
+    "address": "Shivaji Nagar, Pune"
+  },
+  "d31.jfif": {
+    "merchant": "Hotel Dhruvathare",
+    "gstin": "29AADCL1443Q1Z2",
+    "date": "2024-08-20",
+    "invoice_ref": "1761",
+    "total": 320.25,
+    "subtotal": 305,
+    "tax": 15.25,
+    "address": "121, Kalinganahalli Grama, Bellur Hobli, Nagamangala, Mandya, Yediyur, Karnataka 572142"
+  },
+  "d4.jfif": {
+    "merchant": "Hotel Invoice Format",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "blank_template",
+    "unreadable": true
+  },
+  "d5.jfif": {
+    "merchant": "Hotel Bawee",
+    "gstin": "20ASNPN1001Z1",
+    "date": "2021-04-25",
+    "invoice_ref": "121",
+    "total": 1308
+  },
+  "d6.jfif": {
+    "merchant": "Hotel City Palace",
+    "gstin": "20ADFPB1250K1ZE",
+    "date": null,
+    "total": 450
+  },
+  "d7.jfif": {
+    "merchant": "Grandview Hotel",
+    "gstin": "27AABCG4567Q1ZB",
+    "customer_gstin": "19AAACT7896K1Z8",
+    "date": "2021-12-15",
+    "invoice_ref": "GVH/2021/1123",
+    "total": 53100,
+    "subtotal": 45000,
+    "tax": 8100,
+    "address": "123 Marine Drive, Mumbai - 400020"
+  },
+  "d8.jfif": {
+    "merchant": "Indish The Veg Treat",
+    "gstin": null,
+    "date": null,
+    "total": 140,
+    "address": "Pune 411014"
+  },
+  "d9.jfif": {
+    "merchant": "Hotel Food Paradise",
+    "gstin": null,
+    "date": null,
+    "total": 380
+  },
+  "d1.jfif_hw": {
+    "merchant": "Clinic & Medical Store",
+    "gstin": null,
+    "date": null,
+    "total": 244,
+    "is_handwritten": true
+  },
+  "d2.jfif_hw": {
+    "merchant": "The Ajit Bhawan",
+    "gstin": null,
+    "date": null,
+    "invoice_ref": "047404",
+    "total": 810,
+    "is_handwritten": true
+  },
+  "d3.jfif_hw": {
+    "merchant": "Handwritten Cafe Table",
+    "gstin": null,
+    "date": null,
+    "total": 320,
+    "is_handwritten": true
+  },
+  "d4.jfif_hw": {
+    "merchant": "Zanana Hospital Road Medicals",
+    "gstin": null,
+    "date": null,
+    "total": null,
+    "status": "handwritten_prescription",
+    "is_handwritten": true
+  },
+  "d5.jfif_hw": {
+    "merchant": "Nath Traders",
+    "gstin": null,
+    "date": null,
+    "total": 470,
+    "is_handwritten": true
+  },
+  "d7.jfif_hw": {
+    "merchant": "Mahamaya Hotel",
+    "gstin": null,
+    "date": null,
+    "total": 230,
+    "address": "Oakland Road, Shillong",
+    "is_handwritten": true
+  }
+}

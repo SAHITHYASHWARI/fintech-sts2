@@ -911,6 +911,8 @@ export default function BillsAndRemindersView({ currentUser }) {
   const [isGeminiModalOpen, setIsGeminiModalOpen] = useState(false);
   const [tempApiKey, setTempApiKey] = useState('');
   const [visionEngineUsed, setVisionEngineUsed] = useState('');
+  const [financialValidation, setFinancialValidation] = useState(null);
+  const [activeHighlightItemIdx, setActiveHighlightItemIdx] = useState(null);
 
   // Blurry photo warning
   const [isImageBlurry, setIsImageBlurry] = useState(false);
@@ -1205,6 +1207,8 @@ export default function BillsAndRemindersView({ currentUser }) {
     setOcrSupplierGstin('');
     setOcrCustomerGstin('');
     setOcrLineItems([]);
+    setFinancialValidation(null);
+    setActiveHighlightItemIdx(null);
   };
 
   // Process uploaded or captured image with OpenCV 4K & Multi-Pass OCR
@@ -1255,6 +1259,7 @@ export default function BillsAndRemindersView({ currentUser }) {
       setOcrInvoiceRef(f.invoiceNumber ? `Bill No: ${f.invoiceNumber}` : `INV-${Math.floor(1000 + Math.random() * 9000)}`);
       setOcrCategory(f.supplierName?.toLowerCase().includes('hotel') ? 'Hotel & Lodging' : 'General');
       setOcrLineItems(f.items || []);
+      setFinancialValidation(f.financialValidation || null);
       setVisionEngineUsed('OpenCV 4K & Multi-Pass OCR');
 
       // Dismiss blurry warning completely
@@ -2848,10 +2853,26 @@ export default function BillsAndRemindersView({ currentUser }) {
                 {/* 8. Extracted Line Items Table (Structured Table Extraction Engine) */}
                 <div className="pt-2 border-t border-cyan-500/20 space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center text-cyan-400">
-                      <Receipt className="w-3.5 h-3.5 mr-1.5 text-cyan-400" />
-                      Structured Line Items ({ocrLineItems.length})
-                    </label>
+                    <div className="flex items-center space-x-2">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center text-cyan-400">
+                        <Receipt className="w-3.5 h-3.5 mr-1.5 text-cyan-400" />
+                        Structured Line Items ({ocrLineItems.length})
+                      </label>
+                      {financialValidation && (
+                        <span
+                          className={`px-2 py-0.5 text-[9px] font-black rounded-full border flex items-center space-x-1 ${
+                            financialValidation.status === 'GREEN'
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                              : financialValidation.status === 'YELLOW'
+                              ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                              : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                          }`}
+                          title={financialValidation.summaryMessage}
+                        >
+                          <span>{financialValidation.status === 'GREEN' ? '● BALANCED' : financialValidation.status === 'YELLOW' ? '▲ VERIFIED' : '✕ DISCREPANCY'}</span>
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
@@ -2902,7 +2923,15 @@ export default function BillsAndRemindersView({ currentUser }) {
                               const amt = item.amount ?? item.total ?? 0;
                               const unit = item.unit || 'NOS';
                               return (
-                                <tr key={item.id || idx} className="hover:bg-cyan-950/25 transition">
+                                <tr
+                                  key={item.id || idx}
+                                  onClick={() => setActiveHighlightItemIdx(idx)}
+                                  className={`transition cursor-pointer ${
+                                    activeHighlightItemIdx === idx
+                                      ? 'bg-cyan-500/20 border-l-2 border-cyan-400'
+                                      : 'hover:bg-cyan-950/25'
+                                  }`}
+                                >
                                   <td className="px-2.5 py-1.5 text-slate-500 font-mono text-[10px]">
                                     {idx + 1}
                                   </td>
