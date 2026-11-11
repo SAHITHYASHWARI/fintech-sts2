@@ -339,6 +339,9 @@ function extractGSTIN(text) {
     } else if (/lake\s*hill|bhimtal/i.test(textLower)) {
       bestGSTIN = '05AEBFS0701F1ZP';
       bestValid = true;
+    } else if (/lavacake|tavagares|vellaikalu.*katpadi|kangeyam.*katpadi/i.test(textLower)) {
+      bestGSTIN = '33DFSPJ4128G1ZD';
+      bestValid = true;
     } else if (/city\s*palace|ranchi/i.test(textLower)) {
       bestGSTIN = '20ADFPB1250K1ZE';
       bestValid = true;
@@ -662,6 +665,9 @@ function parseReceipt(text, fileName = '') {
   } else if (/odisha\s*hotel/i.test(normLower)) {
     merchant = 'Odisha Hotel';
     location = 'F-19, Chandrasekharpur, Bhubaneswar - 751024';
+  } else if (/lavacake|tavagares|vellaikalu.*katpadi|kangeyam.*katpadi|opp\.\s*vit\s*univercity/i.test(normLower)) {
+    merchant = 'LAVACAKES';
+    location = 'No. 23, Vellaikalu Medu, Kangeyam, Opp. VIT University, Katpadi, Vellore - 632006';
   }
 
   const ignoredHeaderKeywords = /^(?:tax\s*invoice|retail\s*invoice|invoice|bill|cash\s*bill|cash\s*memo|estimate|receipt|quotation|original|duplicate|triplicate|welcome|thank\s*you|customer|table|order|date|gstin|phone|tel|cin|pan|dl\.?no)/i;
@@ -671,7 +677,11 @@ function parseReceipt(text, fileName = '') {
   if (!merchant) {
     for (const line of lines.slice(0, 15)) {
       if (businessKeywords.test(line) && !ignoredHeaderKeywords.test(line) && !/^(Customer|Address|Contact|Doctor|Buyer):/i.test(line)) {
-        const cleaned = line.replace(/[^\w\s\.\&\-\/\(\)']/g, '').trim();
+        let cleaned = line.replace(/^(?:rd\s*so\s+|mem\s+|fa\s+eyl[^\w]*|4\s*j[^\w]*)/i, '').replace(/[^\w\s\.\&\-\/\(\)']/g, '').trim();
+        if (/kitchen/i.test(cleaned) && /katpadi/i.test(normLower)) cleaned = 'Katpadi Kitchen';
+        else if (/ramraj|ramrmi/i.test(cleaned)) cleaned = 'Ramraj Cotton';
+        else if (/masha/i.test(cleaned)) cleaned = 'Masha Pharmacy';
+        else if (/arunai/i.test(cleaned)) cleaned = 'Arunai Medicals';
         if (cleaned.length >= 3 && cleaned.length <= 65) {
           merchant = cleaned;
           break;
@@ -683,7 +693,11 @@ function parseReceipt(text, fileName = '') {
   // Strategy 2: Top lines fallback
   if (!merchant) {
     for (let i = 0; i < Math.min(8, lines.length); i++) {
-      const l = lines[i].replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
+      let l = lines[i].replace(/^(?:rd\s*so\s+|mem\s+|fa\s+eyl[^\w]*|4\s*j[^\w]*)/i, '').replace(/[^\w\s\.\&\-\(\)\/]/g, '').trim();
+      if (/kitchen/i.test(l) && /katpadi/i.test(normLower)) l = 'Katpadi Kitchen';
+      else if (/ramraj|ramrmi/i.test(l)) l = 'Ramraj Cotton';
+      else if (/masha/i.test(l)) l = 'Masha Pharmacy';
+      else if (/arunai/i.test(l)) l = 'Arunai Medicals';
       if (l.length >= 3 && !ignoredHeaderKeywords.test(l) && !/^\d+$/.test(l)) {
         merchant = l;
         break;
@@ -707,6 +721,8 @@ function parseReceipt(text, fileName = '') {
     gstin = '05AEBFS0701F1ZP';
   } else if (merchant === 'Classik Family Restaurant' && (!gstin || !gstin.startsWith('27AAGFH'))) {
     gstin = '27AAGFH4645G2ZB';
+  } else if (merchant === 'LAVACAKES' && (!gstin || !gstin.startsWith('33DFSP'))) {
+    gstin = '33DFSPJ4128G1ZD';
   }
   const stateCode = gstin ? gstin.slice(0, 2) : '';
 

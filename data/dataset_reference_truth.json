@@ -459,5 +459,39 @@
     "total": 230,
     "address": "Oakland Road, Shillong",
     "is_handwritten": true
+  },
+  "09_lavacakes_bill.jpg": {
+    "category": "Food & Dining",
+    "merchant": "LAVACAKES",
+    "gstin": "33DFSPJ4128G1ZD",
+    "customer_gstin": null,
+    "date": "2026-11-07",
+    "invoice_ref": "132509",
+    "subtotal": 170.00,
+    "discount": 0,
+    "tax": 0,
+    "total": 170.00,
+    "address": "No. 23, Vellaikalu Medu, Kangeyam, Opp. VIT University, Katpadi, Vellore - 632006",
+    "items_count": 3,
+    "items": [
+      {
+        "description": "Egg Roll",
+        "qty": 1,
+        "rate": 30.00,
+        "amount": 30.00
+      },
+      {
+        "description": "Brownie with ice",
+        "qty": 1,
+        "rate": 90.00,
+        "amount": 90.00
+      },
+      {
+        "description": "Chicken supreme",
+        "qty": 1,
+        "rate": 50.00,
+        "amount": 50.00
+      }
+    ]
   }
 }

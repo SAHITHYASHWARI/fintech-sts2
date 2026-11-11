@@ -344,6 +344,14 @@ const VERIFIED_ENTERPRISE_REGISTRY = {
     address: '50, Vallimalai Road, Katpadi, Vellore - 632007, Tamil Nadu',
     category: 'Health & Medical',
   },
+  '33DFSPJ4128G1ZD': {
+    tradeName: 'LAVACAKES',
+    legalName: 'LAVACAKES Bakery & Fast Food',
+    address: 'No. 23, Vellaikalu Medu, Kangeyam, Opp. VIT University, Katpadi, Vellore - 632006, Tamil Nadu',
+    category: 'Dining & Restaurant',
+    status: 'Active',
+    verified: true,
+  },
   '33BBBPB4794A1Z8': {
     tradeName: 'Godrej & Premier Appliances (Katpadi Branch)',
     legalName: 'Godrej & Premier Retail Electronics Katpadi',
@@ -1249,7 +1257,15 @@ export default function BillsAndRemindersView({ currentUser }) {
       setOcrSupplierGstin(f.supplierGSTIN || '');
       setOcrCustomerGstin(f.customerGSTIN || '');
       setOcrGstin(f.supplierGSTIN || f.customerGSTIN || '');
-      setOcrGstStatus(f.gstStatus || (f.supplierGSTIN ? 'Verified' : 'GSTIN Not Provided'));
+      const hasGstin = Boolean(f.supplierGSTIN || f.customerGSTIN);
+      const isRegistryVerified = f.supplierGSTIN && Boolean(VERIFIED_ENTERPRISE_REGISTRY[f.supplierGSTIN]);
+      setOcrGstStatus(
+        !hasGstin
+          ? 'GSTIN Not Provided'
+          : isRegistryVerified
+            ? 'ExpressGST Verified'
+            : f.gstStatus || 'Checksum Valid'
+      );
       setOcrTotal(f.totalAmount || '0.00');
       setOcrSubtotal(f.taxableAmount || f.totalAmount || '0.00');
       setOcrTax(f.totalTax || '0.00');
@@ -1402,11 +1418,21 @@ export default function BillsAndRemindersView({ currentUser }) {
     const localEntity = VERIFIED_ENTERPRISE_REGISTRY[clean];
     if (localEntity) {
       const trade = localEntity.tradeName || localEntity.legalName;
-      setOcrMerchant(trade);
+      const curLower = (ocrMerchant || '').toLowerCase().trim();
+      const tradeLower = trade.toLowerCase().trim();
+      const isMismatch = curLower && curLower !== 'verified merchant' &&
+        !tradeLower.includes(curLower) && !curLower.includes(tradeLower);
+
+      if (isMismatch) {
+        setOcrGstStatus('Name Mismatch');
+        showToast(`Taxpayer Registry name: "${trade}" differs from scanned merchant "${ocrMerchant}".`);
+      } else {
+        setOcrMerchant(trade);
+        setOcrGstStatus('ExpressGST Verified');
+        showToast(`✓ ExpressGST / GST Verified: "${trade}" & address autofilled!`);
+      }
       if (localEntity.address) setOcrLocation(localEntity.address);
       if (localEntity.category) setOcrCategory(localEntity.category);
-      setOcrGstStatus('Verified');
-      showToast(`✓ ExpressGST / GST Verified: "${trade}" & address autofilled!`);
       return;
     }
 
@@ -2647,14 +2673,17 @@ export default function BillsAndRemindersView({ currentUser }) {
                         ExpressGST ↗
                       </a>
                       <span
-                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider ${ocrGstStatus === 'Verified'
-                          ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
-                          : ocrGstStatus === 'Invalid'
-                            ? 'bg-rose-950/80 text-rose-300 border border-rose-500/50'
-                            : ocrGstStatus === 'Name Mismatch'
-                              ? 'bg-amber-950/80 text-amber-300 border border-amber-500/50'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
-                          }`}
+                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                          ocrGstStatus.includes('Verified')
+                            ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                            : ocrGstStatus === 'Invalid'
+                              ? 'bg-rose-950/80 text-rose-300 border border-rose-500/50'
+                              : ocrGstStatus === 'Name Mismatch'
+                                ? 'bg-amber-950/80 text-amber-300 border border-amber-500/50'
+                                : ocrGstStatus === 'Checksum Valid'
+                                  ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/50'
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
                       >
                         {ocrGstStatus}
                       </span>
@@ -2696,9 +2725,13 @@ export default function BillsAndRemindersView({ currentUser }) {
                         <Building2 className="w-3.5 h-3.5 mr-1.5 text-teal-400" />
                         Customer / Recipient GSTIN
                       </span>
-                      {ocrCustomerGstin && (
+                      {ocrCustomerGstin ? (
                         <span className="text-[10px] text-teal-300 font-mono bg-teal-950/60 px-2 py-0.5 rounded border border-teal-500/30">
                           B2B Invoice
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 font-mono bg-slate-900/60 px-2 py-0.5 rounded border border-slate-700/30">
+                          B2C (Consumer)
                         </span>
                       )}
                     </label>
@@ -2706,7 +2739,7 @@ export default function BillsAndRemindersView({ currentUser }) {
                       type="text"
                       value={ocrCustomerGstin}
                       onChange={(e) => setOcrCustomerGstin(e.target.value.toUpperCase())}
-                      placeholder="Customer GSTIN (if printed on bill, e.g. 29ABCDE1234F1Z5)"
+                      placeholder="Not Printed on Bill (B2C Receipt)"
                       className="w-full text-xs font-mono font-bold px-3.5 py-2.5 rounded-xl bg-[#0c1424] border border-cyan-500/20 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-teal-400 transition"
                     />
                   </div>

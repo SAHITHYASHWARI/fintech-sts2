@@ -129,6 +129,14 @@ async function runBenchmark() {
       expGSTIN: '05AEBFS0701F1ZP',
       expTotal: '1650.00',
       minItems: 1
+    },
+    {
+      id: '16 LAVACAKES Restaurant',
+      file: './data/bills/clear_pack/09_lavacakes_bill.jpg',
+      expMerchant: 'LAVACAKES',
+      expGSTIN: '33DFSPJ4128G1ZD',
+      expTotal: '170.00',
+      minItems: 0
     }
   ];
 

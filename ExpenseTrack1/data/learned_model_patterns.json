@@ -30,11 +30,11 @@
     "arunai medicals": {
       "merchant": "Arunai Medicals",
       "category": "General",
-      "location": ", Tamil Nadu",
+      "location": "No. 92/1, Katchery Street, Tirupattur, Tamil Nadu – 635601",
       "gstin": "33CMOPS3767A1ZV",
       "confidence": 99.8,
-      "timesConfirmed": 1,
-      "updatedAt": "2026-11-04T09:14:01.416Z"
+      "timesConfirmed": 2,
+      "updatedAt": "2026-11-10T07:16:28.162Z"
     },
     "redbus (makemytrip india limited)": {
       "merchant": "redBus (MakeMyTrip India Limited)",
@@ -56,12 +56,12 @@
     },
     "masha pharmacy": {
       "merchant": "Masha Pharmacy",
-      "category": "Health & Medical",
-      "location": "50, Vallimalai Road, Katpadi, Vellore - 632007, Tamil Nadu",
-      "gstin": "33ACEFM3457F1Z0",
+      "category": "General",
+      "location": "50, Vallimalai Road, Katpadi, Vellore, Tamil Nadu – 632007",
+      "gstin": "33ACEFM3457F1ZE",
       "confidence": 99.8,
-      "timesConfirmed": 1,
-      "updatedAt": "2026-11-05T06:14:34.342Z"
+      "timesConfirmed": 3,
+      "updatedAt": "2026-11-10T07:00:41.903Z"
     },
     "katpadi kitchen": {
       "merchant": "Katpadi Kitchen",
@@ -197,6 +197,24 @@
       "confidence": 99.8,
       "timesConfirmed": 1,
       "updatedAt": "2026-11-05T06:14:34.379Z"
+    },
+    "acmenz wear": {
+      "merchant": "ACMENZ WEAR",
+      "category": "General",
+      "location": "603/2A3 KATPADT TO THIRUVALAM ROAD BHARAT PETRO, Tamil Nadu",
+      "gstin": "33NKHPS7196R1ZP",
+      "confidence": 99.8,
+      "timesConfirmed": 1,
+      "updatedAt": "2026-11-11T08:47:31.615Z"
+    },
+    "lavacakes": {
+      "merchant": "LAVACAKES",
+      "category": "Food & Dining",
+      "location": "No. 23, Vellaikalu Medu, Kangeyam, Opp. VIT University, Katpadi, Vellore - 632006",
+      "gstin": "33DFSPJ4128G1ZD",
+      "confidence": 99.8,
+      "timesConfirmed": 2,
+      "updatedAt": "2026-11-11T09:00:00.000Z"
     }
   },
   "gstins": {
@@ -220,7 +238,7 @@
     },
     "33CMOPS3767A1ZV": {
       "tradeName": "Arunai Medicals",
-      "address": ", Tamil Nadu",
+      "address": "No. 92/1, Katchery Street, Tirupattur, Tamil Nadu – 635601",
       "category": "General",
       "verified": true
     },
@@ -295,13 +313,31 @@
       "address": "Panchsheel Square, Tapovan Road, Amravati, Maharashtra - 444601",
       "category": "General",
       "verified": true
+    },
+    "33ACEFM3457F1ZE": {
+      "tradeName": "Masha Pharmacy",
+      "address": "50, Vallimalai Road, Katpadi, Vellore, Tamil Nadu – 632007",
+      "category": "General",
+      "verified": true
+    },
+    "33NKHPS7196R1ZP": {
+      "tradeName": "ACMENZ WEAR",
+      "address": "603/2A3 KATPADT TO THIRUVALAM ROAD BHARAT PETRO, Tamil Nadu",
+      "category": "General",
+      "verified": true
+    },
+    "33DFSPJ4128G1ZD": {
+      "tradeName": "LAVACAKES",
+      "address": "No. 23, Vellaikalu Medu, Kangeyam, Opp. VIT University, Katpadi, Vellore - 632006",
+      "category": "Food & Dining",
+      "verified": true
     }
   },
   "locations": {},
   "stats": {
-    "totalLearned": 27,
-    "totalScansProcessed": 47,
+    "totalLearned": 29,
+    "totalScansProcessed": 52,
     "accuracyScore": "99.8%",
-    "lastTrainedAt": "2026-11-05T06:23:31.760Z"
+    "lastTrainedAt": "2026-11-11T08:51:15.149Z"
   }
 }
